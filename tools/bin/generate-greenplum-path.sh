@@ -59,19 +59,19 @@ EOF
 # OSX does not need JAVA_HOME 
 if [ "${PLAT}" = "Darwin" ] ; then
 cat << EOF
-PATH=\$GPHOME/bin:\$GPHOME/ext/python/bin:\$PATH
-DYLD_LIBRARY_PATH=\$GPHOME/lib:\$GPHOME/ext/python/lib:\$DYLD_LIBRARY_PATH
+PATH=\$GPHOME/bin:\$PATH
+DYLD_LIBRARY_PATH=\$GPHOME/lib:\$DYLD_LIBRARY_PATH
 EOF
 fi
 
 # Solaris needs amd64 in PATH for java to work
 if [ "${PLAT}" = "SunOS" ] ; then
 cat <<EOF
-PATH=\$GPHOME/bin:\$GPHOME/ext/python/bin:\$PATH
+PATH=\$GPHOME/bin:\$PATH
 EOF
 else
 cat <<EOF
-PATH=\$GPHOME/bin:\$GPHOME/ext/python/bin:\$PATH
+PATH=\$GPHOME/bin:\$PATH
 EOF
 fi
 
@@ -91,7 +91,7 @@ fi
 
 #setup PYTHONPATH
 cat <<EOF
-PYTHONPATH=\$GPHOME/lib/python:\$GPHOME/lib/python/pygresql:\$PYTHONPATH
+PYTHONPATH=\$GPHOME/lib/python:\$PYTHONPATH
 EOF
 
 # openssl configuration file path
