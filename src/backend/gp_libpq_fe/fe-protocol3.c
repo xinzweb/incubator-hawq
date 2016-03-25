@@ -96,6 +96,7 @@ pqParseInput3(PGconn *conn)
 	char		id;
 	int			msgLength;
 	int			avail;
+	int			numRejected = 0;
 
 	/*
 	 * Loop to parse successive complete messages available in the buffer.
@@ -486,9 +487,10 @@ pqParseInput3(PGconn *conn)
 							return;
 					}
 						
-					if (pqGetInt(&(conn->result->numRejected), 4, conn))
+					if (pqGetInt(&numRejected, 4, conn))
 						return;
-							
+
+					conn->result->numRejected += numRejected;
 					break;
 				case 'Y':       /* CDB: statistical response from QE to QD */
 					/* for certain queries, the stats may arrive

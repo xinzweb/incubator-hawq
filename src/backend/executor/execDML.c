@@ -304,7 +304,7 @@ ExecInsert(TupleTableSlot *slot,
 	}
 
 	partslot = reconstructMatchingTupleSlot(slot, resultRelInfo);
-	if (rel_is_heap || rel_is_external)
+	if (rel_is_heap)
 	{
 		tuple = ExecFetchSlotHeapTuple(partslot);
 	}
@@ -419,6 +419,21 @@ ExecInsert(TupleTableSlot *slot,
 		}
 
 		newId = parquet_insert(resultRelInfo->ri_parquetInsertDesc, partslot);
+	}
+	else if (rel_is_external) 
+	{
+		if (estate->es_result_partitions && 
+			estate->es_result_partitions->part->parrelid != 0)
+		{
+			ereport(ERROR,
+				(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
+				errmsg("Insert into external partitions not supported.")));			
+			return;
+		}
+		else
+		{
+			tuple = ExecFetchSlotHeapTuple(partslot);
+		}
 	}
 	else
 	{

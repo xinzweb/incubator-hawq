@@ -276,8 +276,7 @@ init_sql_fcache(FmgrInfo *finfo)
 			ereport(ERROR,
 					(errcode(ERRCODE_DATATYPE_MISMATCH),
 					 errmsg("could not determine actual result type for function declared to return type %s",
-							format_type_be(procedureStruct->prorettype)),
-									errOmitLocation(true)));
+							format_type_be(procedureStruct->prorettype))));
 	}
 
 	fcache->rettype = rettype;
@@ -313,8 +312,7 @@ init_sql_fcache(FmgrInfo *finfo)
 					ereport(ERROR,
 							(errcode(ERRCODE_DATATYPE_MISMATCH),
 							 errmsg("could not determine actual type of argument declared %s",
-									format_type_be(argOidVect[argnum])),
-											errOmitLocation(true)));
+									format_type_be(argOidVect[argnum]))));
 				argOidVect[argnum] = argtype;
 			}
 		}
@@ -874,8 +872,7 @@ fmgr_sql(PG_FUNCTION_ARGS)
 			else
 				ereport(ERROR,
 						(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
-						 errmsg("set-valued function called in context that cannot accept a set"),
-									errOmitLocation(true)));
+						 errmsg("set-valued function called in context that cannot accept a set")));
 			fcinfo->isnull = true;
 			result = (Datum) 0;
 
@@ -914,8 +911,7 @@ fmgr_sql(PG_FUNCTION_ARGS)
 		else
 			ereport(ERROR,
 					(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
-					 errmsg("set-valued function called in context that cannot accept a set"),
-								errOmitLocation(true)));
+					 errmsg("set-valued function called in context that cannot accept a set")));
 
 		/*
 		 * Ensure we will get shut down cleanly if the exprcontext is not run
@@ -1104,8 +1100,7 @@ check_sql_fn_retval(Oid func_id, Oid rettype, List *queryTreeList,
 					(errcode(ERRCODE_INVALID_FUNCTION_DEFINITION),
 			 errmsg("return type mismatch in function declared to return %s",
 					format_type_be(rettype)),
-				 errdetail("Function's final statement must be a SELECT."),
-							errOmitLocation(true)));
+				 errdetail("Function's final statement must be a SELECT.")));
 		return false;
 	}
 
@@ -1127,8 +1122,7 @@ check_sql_fn_retval(Oid func_id, Oid rettype, List *queryTreeList,
 					(errcode(ERRCODE_INVALID_FUNCTION_DEFINITION),
 			 errmsg("return type mismatch in function declared to return %s",
 					format_type_be(rettype)),
-				 errdetail("Function's final statement must be a SELECT."),
-							errOmitLocation(true)));
+				 errdetail("Function's final statement must be a SELECT.")));
 		return false;
 	}
 
@@ -1162,8 +1156,7 @@ check_sql_fn_retval(Oid func_id, Oid rettype, List *queryTreeList,
 					(errcode(ERRCODE_INVALID_FUNCTION_DEFINITION),
 			 errmsg("return type mismatch in function declared to return %s",
 					format_type_be(rettype)),
-				 errdetail("Final SELECT must return exactly one column."),
-							errOmitLocation(true)));
+				 errdetail("Final SELECT must return exactly one column.")));
 
 		restype = exprType((Node *) ((TargetEntry *) linitial(tlist))->expr);
 		if (!IsBinaryCoercible(restype, rettype))
@@ -1172,8 +1165,7 @@ check_sql_fn_retval(Oid func_id, Oid rettype, List *queryTreeList,
 			 errmsg("return type mismatch in function declared to return %s",
 					format_type_be(rettype)),
 					 errdetail("Actual return type is %s.",
-							   format_type_be(restype)),
-										errOmitLocation(true)));
+							   format_type_be(restype))));
 	}
 	else if (fn_typtype == 'c' || rettype == RECORDOID)
 	{
@@ -1240,8 +1232,7 @@ check_sql_fn_retval(Oid func_id, Oid rettype, List *queryTreeList,
 							(errcode(ERRCODE_INVALID_FUNCTION_DEFINITION),
 							 errmsg("return type mismatch in function declared to return %s",
 									format_type_be(rettype)),
-					   errdetail("Final SELECT returns too many columns."),
-								errOmitLocation(true)));
+					   errdetail("Final SELECT returns too many columns.")));
 				attr = tupdesc->attrs[colindex - 1];
 			} while (attr->attisdropped);
 			tuplogcols++;
@@ -1256,8 +1247,7 @@ check_sql_fn_retval(Oid func_id, Oid rettype, List *queryTreeList,
 						 errdetail("Final SELECT returns %s instead of %s at column %d.",
 								   format_type_be(tletype),
 								   format_type_be(atttype),
-								   tuplogcols),
-											errOmitLocation(true)));
+								   tuplogcols)));
 		}
 
 		for (;;)
@@ -1274,8 +1264,7 @@ check_sql_fn_retval(Oid func_id, Oid rettype, List *queryTreeList,
 					(errcode(ERRCODE_INVALID_FUNCTION_DEFINITION),
 			 errmsg("return type mismatch in function declared to return %s",
 					format_type_be(rettype)),
-					 errdetail("Final SELECT returns too few columns."),
-								errOmitLocation(true)));
+					 errdetail("Final SELECT returns too few columns.")));
 
 		/* Set up junk filter if needed */
 		if (junkFilter)
@@ -1292,15 +1281,13 @@ check_sql_fn_retval(Oid func_id, Oid rettype, List *queryTreeList,
 		ereport(ERROR,
 				(errcode(ERRCODE_INVALID_FUNCTION_DEFINITION),
 				 errmsg("cannot determine result data type"),
-				 errdetail("A function returning \"anyarray\" or \"anyelement\" must have at least one argument of either type."),
-							errOmitLocation(true)));
+				 errdetail("A function returning \"anyarray\" or \"anyelement\" must have at least one argument of either type.")));
 	}
 	else
 		ereport(ERROR,
 				(errcode(ERRCODE_INVALID_FUNCTION_DEFINITION),
 				 errmsg("return type %s is not supported for SQL functions",
-						format_type_be(rettype)),
-								errOmitLocation(true)));
+						format_type_be(rettype))));
 
 	return false;
 }

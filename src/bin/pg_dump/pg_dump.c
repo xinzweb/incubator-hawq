@@ -158,6 +158,7 @@ static const CatalogId nilCatalogId = {0, 0};
 static NamespaceInfo *g_namespaces;
 static int	g_numNamespaces;
 
+const char *EXT_PARTITION_NAME_POSTFIX = "_external_partition__";
 /* flag to turn on/off dollar quoting */
 static int	disable_dollar_quoting = 0;
 static int	dump_inserts = 0;
@@ -221,6 +222,7 @@ static void dumpACL(Archive *fout, CatalogId objCatId, DumpId objDumpId,
 		const char *acls);
 
 static void getDependencies(void);
+static void setExtPartDependency(TableInfo *tblinfo, int numTables);
 static void getDomainConstraints(TypeInfo *tinfo);
 static void getTableData(TableInfo *tblinfo, int numTables, bool oids);
 static char *format_function_arguments(FuncInfo *finfo, int nallargs,
@@ -833,6 +835,8 @@ main(int argc, char **argv)
 	 * Collect dependency data to assist in ordering the objects.
 	 */
 	getDependencies();
+	
+	setExtPartDependency(tblinfo, numTables);
 
 	/*
 	 * Sort the objects into a safe dump order (no forward references).
@@ -1210,14 +1214,14 @@ dumpTableData_copy(Archive *fout, void *dcontext)
 
 	if (oids && hasoids)
 	{
-		appendPQExpBuffer(q, "COPY %s %s WITH OIDS TO stdout;",
+		appendPQExpBuffer(q, "COPY %s %s WITH OIDS TO stdout IGNORE EXTERNAL PARTITIONS;",
 						  fmtQualifiedId(tbinfo->dobj.namespace->dobj.name,
 										 classname),
 						  column_list);
 	}
 	else
 	{
-		appendPQExpBuffer(q, "COPY %s %s TO stdout;",
+		appendPQExpBuffer(q, "COPY %s %s TO stdout IGNORE EXTERNAL PARTITIONS;",
 						  fmtQualifiedId(tbinfo->dobj.namespace->dobj.name,
 										 classname),
 						  column_list);
@@ -2840,6 +2844,7 @@ getTables(int *numTables)
 	int			i_owning_col;
 	int			i_reltablespace;
 	int			i_reloptions;
+	int			i_parrelid;
 
 	/* Make sure we are in proper schema */
 	selectSourceSchema("pg_catalog");
@@ -2878,13 +2883,16 @@ getTables(int *numTables)
 					  "d.refobjid as owning_tab, "
 					  "d.refobjsubid as owning_col, "
 					  "(SELECT spcname FROM pg_tablespace t WHERE t.oid = c.reltablespace) AS reltablespace, "
-					  "array_to_string(c.reloptions, ', ') as reloptions "
+					  "array_to_string(c.reloptions, ', ') as reloptions, "
+					  "p.parrelid as parrelid "
 					  "from pg_class c "
 					  "left join pg_depend d on "
 					  "(c.relkind = '%c' and "
 					  "d.classid = c.tableoid and d.objid = c.oid and "
 					  "d.objsubid = 0 and "
 					  "d.refclassid = c.tableoid and d.deptype = 'a') "
+					  "left join pg_partition_rule pr on c.oid = pr.parchildrelid "
+					  "left join pg_partition p on pr.paroid = p.oid "
 					  "where relkind in ('%c', '%c', '%c', '%c') %s"
 					  "order by c.oid",
 					  username_subquery,
@@ -2892,8 +2900,8 @@ getTables(int *numTables)
 					  RELKIND_RELATION, RELKIND_SEQUENCE,
 					  RELKIND_VIEW, RELKIND_COMPOSITE_TYPE,
 					  g_fout->remoteVersion >= 80209 ?
-					  "AND c.oid NOT IN (select parchildrelid from "
-					  "pg_partition_rule)" : "");
+					  "AND c.oid NOT IN (select p.parchildrelid from pg_partition_rule p left "
+					  "join pg_exttable e on p.parchildrelid=e.reloid where e.reloid is null)" : "");
 
 	res = PQexec(g_conn, query->data);
 	check_sql_result(res, g_conn, query->data, PGRES_TUPLES_OK);
@@ -2931,6 +2939,7 @@ getTables(int *numTables)
 	i_owning_col = PQfnumber(res, "owning_col");
 	i_reltablespace = PQfnumber(res, "reltablespace");
 	i_reloptions = PQfnumber(res, "reloptions");
+	i_parrelid = PQfnumber(res, "parrelid");
 
 	for (i = 0; i < ntups; i++)
 	{
@@ -2963,6 +2972,17 @@ getTables(int *numTables)
 		}
 		tblinfo[i].reltablespace = strdup(PQgetvalue(res, i, i_reltablespace));
 		tblinfo[i].reloptions = strdup(PQgetvalue(res, i, i_reloptions));
+		tblinfo[i].parrelid = atooid(PQgetvalue(res, i, i_parrelid));
+		if (tblinfo[i].parrelid != 0)
+		{
+			/*
+			 * Length of tmpStr is bigger than the sum of NAMEDATALEN 
+			 * and the length of EXT_PARTITION_NAME_POSTFIX 
+			 */
+			char tmpStr[500];
+			snprintf(tmpStr, sizeof(tmpStr), "%s%s", tblinfo[i].dobj.name, EXT_PARTITION_NAME_POSTFIX);
+			tblinfo[i].dobj.name = strdup(tmpStr);
+		}
 
 		/* other fields were zeroed above */
 
@@ -2986,7 +3006,7 @@ getTables(int *numTables)
 		 * NOTE: it'd be kinda nice to lock other relations too, not only
 		 * plain tables, but the backend doesn't presently allow that.
 		 */
-		if (tblinfo[i].dobj.dump && tblinfo[i].relkind == RELKIND_RELATION)
+		if (tblinfo[i].dobj.dump && tblinfo[i].relkind == RELKIND_RELATION && tblinfo[i].parrelid == 0)
 		{
 			resetPQExpBuffer(lockquery);
 			appendPQExpBuffer(lockquery,
@@ -7484,80 +7504,10 @@ dumpTable(Archive *fout, TableInfo *tbinfo)
 	}
 }
 
-/*
- * dumpTableSchema
- *	  write the declaration (not data) of one user-defined table or view
- */
 static void
-dumpTableSchema(Archive *fout, TableInfo *tbinfo)
+dumpExternal(TableInfo *tbinfo, PQExpBuffer query, PQExpBuffer q, PQExpBuffer delq)
 {
-	PQExpBuffer query = createPQExpBuffer();
-	PQExpBuffer q = createPQExpBuffer();
-	PQExpBuffer delq = createPQExpBuffer();
-	PGresult   *res;
-	int			numParents;
-	TableInfo **parents;
-	int			actual_atts;	/* number of attrs in this CREATE statment */
-	char	   *reltypename;
-	char	   *storage;
-	int			j,
-				k;
-
-	/* Make sure we are in proper schema */
-	selectSourceSchema(tbinfo->dobj.namespace->dobj.name);
-
-	/* Is it a table or a view? */
-	if (tbinfo->relkind == RELKIND_VIEW)
-	{
-		char	   *viewdef;
-
-		reltypename = "VIEW";
-
-		/* Fetch the view definition */
-		appendPQExpBuffer(query,
-		 "SELECT pg_catalog.pg_get_viewdef('%u'::pg_catalog.oid) as viewdef",
-						  tbinfo->dobj.catId.oid);
-
-		res = PQexec(g_conn, query->data);
-		check_sql_result(res, g_conn, query->data, PGRES_TUPLES_OK);
-
-		if (PQntuples(res) != 1)
-		{
-			if (PQntuples(res) < 1)
-				write_msg(NULL, "query to obtain definition of view \"%s\" returned no data\n",
-						  tbinfo->dobj.name);
-			else
-				write_msg(NULL, "query to obtain definition of view \"%s\" returned more than one definition\n",
-						  tbinfo->dobj.name);
-			exit_nicely();
-		}
-
-		viewdef = PQgetvalue(res, 0, 0);
-
-		if (strlen(viewdef) == 0)
-		{
-			write_msg(NULL, "definition of view \"%s\" appears to be empty (length zero)\n",
-					  tbinfo->dobj.name);
-			exit_nicely();
-		}
-
-		/*
-		 * DROP must be fully qualified in case same name appears in
-		 * pg_catalog
-		 */
-		appendPQExpBuffer(delq, "DROP VIEW %s.",
-						  fmtId(tbinfo->dobj.namespace->dobj.name));
-		appendPQExpBuffer(delq, "%s;\n",
-						  fmtId(tbinfo->dobj.name));
-
-		appendPQExpBuffer(q, "CREATE VIEW %s AS\n    %s\n",
-						  fmtId(tbinfo->dobj.name), viewdef);
-
-		PQclear(res);
-	}
-	/* START MPP ADDITION */
-	else if (tbinfo->relstorage == RELSTORAGE_EXTERNAL)
-	{
+		PGresult   *res;
 		char	   *locations;
 		char	   *location;
 		char	   *fmttype;
@@ -7574,8 +7524,6 @@ dumpTableSchema(Archive *fout, TableInfo *tbinfo)
 		char	   *customfmt = NULL;
 		bool		isweb = false;
 		bool		iswritable = false;
-
-		reltypename = "EXTERNAL TABLE";
 
 		/*
 		 * DROP must be fully qualified in case same name appears in
@@ -7669,7 +7617,8 @@ dumpTableSchema(Archive *fout, TableInfo *tbinfo)
 						  (isweb ? "WEB " : ""),
 						  fmtId(tbinfo->dobj.name));
 
-		actual_atts = 0;
+		int actual_atts = 0;
+		int j;
 		for (j = 0; j < tbinfo->numatts; j++)
 		{
 			/* Is this one of the table's own attrs, and not dropped ? */
@@ -7818,6 +7767,84 @@ dumpTableSchema(Archive *fout, TableInfo *tbinfo)
 		appendPQExpBuffer(q, ";\n");
 
 		PQclear(res);
+}
+
+/*
+ * dumpTableSchema
+ *	  write the declaration (not data) of one user-defined table or view
+ */
+static void
+dumpTableSchema(Archive *fout, TableInfo *tbinfo)
+{
+	PQExpBuffer query = createPQExpBuffer();
+	PQExpBuffer q = createPQExpBuffer();
+	PQExpBuffer delq = createPQExpBuffer();
+	PGresult   *res;
+	int			numParents;
+	TableInfo **parents;
+	int			actual_atts;	/* number of attrs in this CREATE statment */
+	char	   *reltypename;
+	char	   *storage;
+	int			j,
+				k;
+
+	/* Make sure we are in proper schema */
+	selectSourceSchema(tbinfo->dobj.namespace->dobj.name);
+
+	/* Is it a table or a view? */
+	if (tbinfo->relkind == RELKIND_VIEW)
+	{
+		char	   *viewdef;
+
+		reltypename = "VIEW";
+
+		/* Fetch the view definition */
+		appendPQExpBuffer(query,
+		 "SELECT pg_catalog.pg_get_viewdef('%u'::pg_catalog.oid) as viewdef",
+						  tbinfo->dobj.catId.oid);
+
+		res = PQexec(g_conn, query->data);
+		check_sql_result(res, g_conn, query->data, PGRES_TUPLES_OK);
+
+		if (PQntuples(res) != 1)
+		{
+			if (PQntuples(res) < 1)
+				write_msg(NULL, "query to obtain definition of view \"%s\" returned no data\n",
+						  tbinfo->dobj.name);
+			else
+				write_msg(NULL, "query to obtain definition of view \"%s\" returned more than one definition\n",
+						  tbinfo->dobj.name);
+			exit_nicely();
+		}
+
+		viewdef = PQgetvalue(res, 0, 0);
+
+		if (strlen(viewdef) == 0)
+		{
+			write_msg(NULL, "definition of view \"%s\" appears to be empty (length zero)\n",
+					  tbinfo->dobj.name);
+			exit_nicely();
+		}
+
+		/*
+		 * DROP must be fully qualified in case same name appears in
+		 * pg_catalog
+		 */
+		appendPQExpBuffer(delq, "DROP VIEW %s.",
+						  fmtId(tbinfo->dobj.namespace->dobj.name));
+		appendPQExpBuffer(delq, "%s;\n",
+						  fmtId(tbinfo->dobj.name));
+
+		appendPQExpBuffer(q, "CREATE VIEW %s AS\n    %s\n",
+						  fmtId(tbinfo->dobj.name), viewdef);
+
+		PQclear(res);
+	}
+	/* START MPP ADDITION */
+	else if (tbinfo->relstorage == RELSTORAGE_EXTERNAL)
+	{
+		reltypename = "EXTERNAL TABLE";
+		dumpExternal(tbinfo, query, q, delq);
 	}
 	else if (tbinfo->relstorage == RELSTORAGE_FOREIGN)
 	{
@@ -8100,6 +8127,51 @@ dumpTableSchema(Archive *fout, TableInfo *tbinfo)
 		/* END MPP ADDITION */
 
 		appendPQExpBuffer(q, ";\n");
+
+		/* Exchange external partition */
+		if (gp_partitioning_available)
+		{
+			int i = 0;
+			int ntups = 0;
+			char *relname = NULL;
+			char *parname = NULL;
+			int i_relname = 0;
+			int i_parname = 0;
+			resetPQExpBuffer(query);
+
+			appendPQExpBuffer(query, "SELECT "
+						      "c.relname, pr.parname FROM pg_partition_rule pr "
+						      "join pg_class c ON pr.parchildrelid = c.oid "
+						      "join pg_partition p ON p.oid = pr.paroid "
+						      "WHERE p.parrelid = %u AND c.relstorage = 'x';", tbinfo->dobj.catId.oid);
+
+			res = PQexec(g_conn, query->data);
+			check_sql_result(res, g_conn, query->data, PGRES_TUPLES_OK);
+
+			ntups = PQntuples(res);
+			i_relname = PQfnumber(res, "relname");
+			i_parname = PQfnumber(res, "parname");
+
+
+			for (i = 0; i < ntups; i++)
+			{
+				char tmpExtTable[500] = {0};
+				relname = strdup(PQgetvalue(res, i, i_relname));
+				parname = strdup(PQgetvalue(res, i, i_parname));
+				snprintf(tmpExtTable, sizeof(tmpExtTable), "%s%s", relname, EXT_PARTITION_NAME_POSTFIX);
+				appendPQExpBuffer(q, "ALTER TABLE %s ", fmtId(tbinfo->dobj.name));
+				appendPQExpBuffer(q, "EXCHANGE PARTITION %s ", fmtId(parname));
+				appendPQExpBuffer(q, "WITH TABLE %s WITHOUT VALIDATION; ", fmtId(tmpExtTable));
+
+				appendPQExpBuffer(q, "\n");
+
+				appendPQExpBuffer(q, "DROP TABLE %s; ", fmtId(tmpExtTable));
+
+				appendPQExpBuffer(q, "\n");
+			}
+
+			PQclear(res);
+		}
 
 		/* Loop dumping statistics and storage statements */
 		for (j = 0; j < tbinfo->numatts; j++)
@@ -9043,6 +9115,34 @@ dumpRule(Archive *fout, RuleInfo *rinfo)
 	destroyPQExpBuffer(query);
 	destroyPQExpBuffer(cmd);
 	destroyPQExpBuffer(delcmd);
+}
+
+/*
+ * setExtPartDependency -
+ */
+static void
+setExtPartDependency(TableInfo *tblinfo, int numTables)
+{
+	int			i;
+	int			j;
+
+	for (i = 0; i < numTables; i++)
+	{
+		TableInfo  *tbinfo = &(tblinfo[i]);
+		Oid parrelid = tbinfo->parrelid;
+
+		if (parrelid == 0)
+			continue;
+
+		for (j = 0; j < numTables; j++)
+		{
+			TableInfo  *ti = &(tblinfo[j]);
+			if (ti->dobj.catId.oid != parrelid)
+				continue;
+			addObjectDependency(&ti->dobj, tbinfo->dobj.dumpId);
+			removeObjectDependency(&tbinfo->dobj, ti->dobj.dumpId);
+		}
+	}
 }
 
 /*

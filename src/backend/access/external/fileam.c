@@ -130,6 +130,7 @@ elog(DEBUG2, "external_getnext returning tuple")
  * from the outside during an error/abort (in AbortTransaction).
  */
 static FILE *g_dataSource = NULL;
+static MemoryContext g_dataSourceCtx = NULL;
 
 
 /* ----------------
@@ -173,6 +174,16 @@ external_beginscan(Relation relation, Index scanrelid, uint32 scancounter,
 	scan->fs_noop = false;
 	scan->fs_file = NULL;
 	scan->fs_formatter = NULL;
+	scan->fs_constraintExprs = NULL;
+	if (relation->rd_att->constr != NULL && relation->rd_att->constr->num_check > 0)
+	{
+		scan->fs_hasConstraints = true;
+	}
+	else
+	{
+		scan->fs_hasConstraints = false;
+	}
+
 
 	/*
 	 * get the external URI assigned to us.
@@ -1294,24 +1305,21 @@ lookupCustomFormatter(char *formatter_name, bool iswritable)
 							errmsg("formatter function %s of type %s was not found.",
 									formatter_name,
 									(iswritable ? "writable" : "readable")),
-							errhint("Create it with CREATE FUNCTION."),
-							errOmitLocation(true)));
+							errhint("Create it with CREATE FUNCTION.")));
 
 		/* check return type matches */
 		if (get_func_rettype(procOid) != returnOid)
 			ereport(ERROR, (errcode(ERRCODE_INVALID_OBJECT_DEFINITION),
 							errmsg("formatter function %s of type %s has an incorrect return type",
 									formatter_name,
-									(iswritable ? "writable" : "readable")),
-							errOmitLocation(true)));
+									(iswritable ? "writable" : "readable"))));
 
 		/* check allowed volatility */
 		if (func_volatile(procOid) != PROVOLATILE_STABLE)
 			ereport(ERROR,
 					(errcode(ERRCODE_INVALID_FUNCTION_DEFINITION),
 					 errmsg("formatter function %s is not declared STABLE.",
-							 formatter_name),
-					 errOmitLocation(true)));
+							 formatter_name)));
 
 		return procOid;
 }
@@ -1741,6 +1749,12 @@ close_external_source(FILE *dataSource, bool failOnError, const char *relname)
 	{
 		url_fclose((URL_FILE*) f, failOnError, relname);
 	}
+
+	if (g_dataSourceCtx != NULL)
+	{
+		MemoryContextDelete(g_dataSourceCtx);
+		g_dataSourceCtx = NULL;
+	}
 }
 
 /*
@@ -1939,7 +1953,16 @@ gfile_printf_then_putc_newline(const char*format,...)
 void*
 gfile_malloc(size_t size)
 {
-	return palloc(size);
+	if (g_dataSourceCtx == NULL)
+	{
+		g_dataSourceCtx = AllocSetContextCreate(TopMemoryContext,
+												"DataSourceContext",
+												ALLOCSET_SMALL_MINSIZE,
+												ALLOCSET_SMALL_INITSIZE,
+												ALLOCSET_SMALL_MAXSIZE);
+	}
+
+	return MemoryContextAlloc(g_dataSourceCtx, size);
 }
 
 void

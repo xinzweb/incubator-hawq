@@ -68,6 +68,7 @@ makeCdbCopy(bool is_copy_in, QueryResource *resource)
 	c->remote_data_err = false;	
 	c->io_errors = false;
 	c->copy_in = is_copy_in;
+	c->skip_ext_partition = false;
 	c->outseglist = NIL;
 	c->partitions = NULL;
 	c->ao_segnos = NIL;
@@ -192,6 +193,8 @@ cdbCopyStart(CdbCopy *c, char *copyCmd, Oid relid, Oid relerror, List *err_aoseg
 	
 	/* add in AO segno map for dispatch */
 	((CopyStmt *)q->utilityStmt)->ao_segnos = c->ao_segnos;
+
+	((CopyStmt *)q->utilityStmt)->skip_ext_partition = c->skip_ext_partition;
 	
 	((CopyStmt *)q->utilityStmt)->err_aosegnos = err_aosegnos;
 

@@ -43,6 +43,7 @@
 #include "access/genam.h"
 #include "access/hash.h"
 #include "access/heapam.h"
+#include "access/fileam.h"
 #include "access/extprotocol.h"
 #include "access/filesplit.h"
 #include "access/nbtree.h"
@@ -407,6 +408,7 @@ static RangeVar *make_temp_table_name(Relation rel, BackendId id);
 static bool prebuild_temp_table(Relation rel, RangeVar *tmpname, List *distro,
 								List *opts, List **hidden_types, bool isTmpTableAo);
 static void ATPartitionCheck(AlterTableType subtype, Relation rel, bool rejectroot, bool recursing);
+static void ATExternalPartitionCheck(AlterTableType subtype, Relation rel, bool recursing);
 static void InvokeProtocolValidation(Oid procOid, char *procName, bool iswritable, List *locs, List* fmtopts);
 
 static char *alterTableCmdString(AlterTableType subtype);
@@ -490,8 +492,7 @@ DefineRelation_int(CreateStmt *stmt,
 	if (stmt->oncommit != ONCOMMIT_NOOP && !stmt->relation->istemp)
 		ereport(ERROR,
 				(errcode(ERRCODE_INVALID_TABLE_DEFINITION),
-				 errmsg("ON COMMIT can only be used on temporary tables"),
-						   errOmitLocation(true)));
+				 errmsg("ON COMMIT can only be used on temporary tables")));
 
 	/*
 	 * Look up the namespace in which we are supposed to create the relation.
@@ -546,8 +547,7 @@ DefineRelation_int(CreateStmt *stmt,
 			ereport(ERROR,
 					(errcode(ERRCODE_UNDEFINED_OBJECT),
 					 errmsg("tablespace \"%s\" does not exist",
-							stmt->tablespacename),
-					 errOmitLocation(true)));
+							stmt->tablespacename)));
 	}
 	else
 	{
@@ -684,8 +684,7 @@ DefineRelation_int(CreateStmt *stmt,
 					 errmsg(
 							 "OIDS=TRUE is not allowed on partitioned tables. "
 							 "Use OIDS=FALSE"
-							 ),
-					 errOmitLocation(true)));
+							 )));
 
     if (stmt->oidInfo.relOid)
         elog(DEBUG4, "DefineRelation relOid=%d schemaname=%s ",
@@ -987,16 +986,14 @@ DefineExternalRelation(CreateExternalStmt *createExtStmt)
 			if(strlen(commandString) == 0)
 				ereport(ERROR,
 						(errcode(ERRCODE_SYNTAX_ERROR),
-						 errmsg("Invalid EXECUTE clause. Found an empty command string"),
-								   errOmitLocation(true)));
+						 errmsg("Invalid EXECUTE clause. Found an empty command string")));
 
 			break;
 
 		default:
 			ereport(ERROR,
 					(errcode(ERRCODE_GP_INTERNAL_ERROR),
-					 errmsg("Internal error: unknown external table type"),
-							   errOmitLocation(true)));
+					 errmsg("Internal error: unknown external table type")));
 	}
 
 	/*
@@ -1014,8 +1011,7 @@ DefineExternalRelation(CreateExternalStmt *createExtStmt)
 		{
 			ereport(ERROR,
 					(errcode(ERRCODE_INSUFFICIENT_PRIVILEGE),
-					 errmsg("must be superuser to create an EXECUTE external web table"),
-							   errOmitLocation(true)));
+					 errmsg("must be superuser to create an EXECUTE external web table")));
 		}
 		else
 		{
@@ -1030,8 +1026,7 @@ DefineExternalRelation(CreateExternalStmt *createExtStmt)
 			{
 				ereport(ERROR,
 						(errcode(ERRCODE_INSUFFICIENT_PRIVILEGE),
-						 errmsg("must be superuser to create an external table with a file protocol"),
-								   errOmitLocation(true)));
+						 errmsg("must be superuser to create an external table with a file protocol")));
 			}
 			else if(!gp_external_grant_privileges)
 			{
@@ -1069,8 +1064,7 @@ DefineExternalRelation(CreateExternalStmt *createExtStmt)
 					if (!createwextgpfd)
 						ereport(ERROR,
 								(errcode(ERRCODE_INSUFFICIENT_PRIVILEGE),
-								errmsg("permission denied: no privilege to create a writable gpfdist(s) external table"),
-										errOmitLocation(true)));
+								errmsg("permission denied: no privilege to create a writable gpfdist(s) external table")));
 				}
 				else if ( (uri->protocol == URI_GPFDIST || uri->protocol == URI_GPFDISTS) && !iswritable)
 				{
@@ -1081,8 +1075,7 @@ DefineExternalRelation(CreateExternalStmt *createExtStmt)
 					if (!createrextgpfd)
 						ereport(ERROR,
 								(errcode(ERRCODE_INSUFFICIENT_PRIVILEGE),
-								errmsg("permission denied: no privilege to create a readable gpfdist(s) external table"),
-										errOmitLocation(true)));
+								errmsg("permission denied: no privilege to create a readable gpfdist(s) external table")));
 
 				}
 				else if (uri->protocol == URI_HTTP && !iswritable)
@@ -1094,8 +1087,7 @@ DefineExternalRelation(CreateExternalStmt *createExtStmt)
 					if (!createrexthttp)
 						ereport(ERROR,
 								(errcode(ERRCODE_INSUFFICIENT_PRIVILEGE),
-								errmsg("permission denied: no privilege to create an http external table"),
-										errOmitLocation(true)));
+								errmsg("permission denied: no privilege to create an http external table")));
 				}
 				else if (uri->protocol == URI_CUSTOM)
 				{
@@ -1163,8 +1155,7 @@ DefineExternalRelation(CreateExternalStmt *createExtStmt)
 					(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
 					 errmsg("KEEP is not supported in the external table definition. "
 							"Error table will be dropped when its external table is "
-							"dropped."),
-									   errOmitLocation(true)));
+							"dropped.")));
 
 		if(singlerowerrorDesc->errtable)
 			fmtErrTblOid = RangeVarGetRelid(singlerowerrorDesc->errtable, true, false /*allowHcatalog*/);
@@ -1184,8 +1175,7 @@ DefineExternalRelation(CreateExternalStmt *createExtStmt)
 		if (dencoding)
 			ereport(ERROR,
 					(errcode(ERRCODE_SYNTAX_ERROR),
-					 errmsg("conflicting or redundant ENCODING specification"),
-							   errOmitLocation(true)));
+					 errmsg("conflicting or redundant ENCODING specification")));
 		dencoding = defel;
 	}
 
@@ -1202,8 +1192,7 @@ DefineExternalRelation(CreateExternalStmt *createExtStmt)
 				ereport(ERROR,
 						(errcode(ERRCODE_UNDEFINED_OBJECT),
 						 errmsg("%d is not a valid encoding code",
-								encoding),
-										   errOmitLocation(true)));
+								encoding)));
 		}
 		else if (IsA(dencoding->arg, String))
 		{
@@ -1212,8 +1201,7 @@ DefineExternalRelation(CreateExternalStmt *createExtStmt)
 				ereport(ERROR,
 						(errcode(ERRCODE_UNDEFINED_OBJECT),
 						 errmsg("%s is not a valid encoding name",
-								encoding_name),
-										   errOmitLocation(true)));
+								encoding_name)));
 			encoding = pg_char_to_encoding(encoding_name);
 		}
 		else
@@ -1545,8 +1533,7 @@ RemoveRelation(const RangeVar *relation, DropBehavior behavior,
 				errhint("Table \"%s\" is a child partition of table "
 						"\"%s\".  To drop it, use ALTER TABLE \"%s\"%s...",
 						get_rel_name(relOid), get_rel_name(master),
-						get_rel_name(master), pretty ? pretty : "" ),
-								   errOmitLocation(true)));
+						get_rel_name(master), pretty ? pretty : "" )));
 
 	}
 
@@ -1701,14 +1688,12 @@ ExecuteTruncate(TruncateStmt *stmt)
 					ereport(ERROR,
 							(errcode(ERRCODE_UNDEFINED_TABLE),
 							 errmsg("relation \"%s.%s\" does not exist",
-									rv->schemaname, rv->relname),
-							 errOmitLocation(true)));
+									rv->schemaname, rv->relname)));
 				else
 					ereport(ERROR,
 							(errcode(ERRCODE_UNDEFINED_TABLE),
 							 errmsg("relation \"%s\" does not exist",
-									rv->relname),
-							 errOmitLocation(true)));
+									rv->relname)));
 				PG_RE_THROW();
 			}
 			PG_END_TRY();
@@ -1741,7 +1726,24 @@ ExecuteTruncate(TruncateStmt *stmt)
 		{
 			/* add the partitions to the relation list and try again */
 			if (partcheck == 1)
+			{
 				stmt->relations = list_concat(partList, stmt->relations);
+
+				cell = list_head(stmt->relations);
+				while (cell != NULL)
+				{
+					RangeVar   *rv = lfirst(cell);
+					Relation	rel;
+
+					cell = lnext(cell);
+					rel = heap_openrv(rv, AccessExclusiveLock);
+					if (RelationIsExternal(rel))
+					{
+						elog(ERROR, "Cannot truncate table having external partition:\"%s\".", RelationGetRelationName(rel));
+					}
+					heap_close(rel, NoLock);
+				}
+			}
 		}
 		else
 			/* no partitions - no need to try again */
@@ -1792,8 +1794,7 @@ ExecuteTruncate(TruncateStmt *stmt)
 				rel = heap_open(relid, AccessExclusiveLock);
 				ereport(NOTICE,
 						(errmsg("truncate cascades to table \"%s\"",
-								RelationGetRelationName(rel)),
-										   errOmitLocation(true)));
+								RelationGetRelationName(rel))));
 				truncate_check_rel(rel);
 				rels = lappend(rels, rel);
 				relids = lappend_oid(relids, relid);
@@ -1902,15 +1903,13 @@ truncate_check_rel(Relation rel)
 			ereport(ERROR,
 					(errcode(ERRCODE_WRONG_OBJECT_TYPE),
 					 errmsg("\"%s\" is not a table",
-							RelationGetRelationName(rel)),
-									   errOmitLocation(true)));
+							RelationGetRelationName(rel))));
 
 	if (RelationIsExternal(rel))
 		ereport(ERROR,
 				(errcode(ERRCODE_WRONG_OBJECT_TYPE),
 				 errmsg("\"%s\" is an external relation and can't be truncated",
-						RelationGetRelationName(rel)),
-								   errOmitLocation(true)));
+						RelationGetRelationName(rel))));
 
 
 	/* Permissions checks */
@@ -1922,8 +1921,7 @@ truncate_check_rel(Relation rel)
 		ereport(ERROR,
 				(errcode(ERRCODE_INSUFFICIENT_PRIVILEGE),
 				 errmsg("permission denied: \"%s\" is a system catalog",
-						RelationGetRelationName(rel)),
-								   errOmitLocation(true)));
+						RelationGetRelationName(rel))));
 
 	/*
 	 * We can never allow truncation of shared or nailed-in-cache relations,
@@ -1933,8 +1931,7 @@ truncate_check_rel(Relation rel)
 		ereport(ERROR,
 				(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
 				 errmsg("cannot truncate system relation \"%s\"",
-						RelationGetRelationName(rel)),
-								   errOmitLocation(true)));
+						RelationGetRelationName(rel))));
 
 	/*
 	 * Don't allow truncate on temp tables of other backends ... their local
@@ -1943,8 +1940,7 @@ truncate_check_rel(Relation rel)
 	if (isOtherTempNamespace(RelationGetNamespace(rel)))
 		ereport(ERROR,
 				(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
-			  errmsg("cannot truncate temporary tables of other sessions"),
-					   errOmitLocation(true)));
+			  errmsg("cannot truncate temporary tables of other sessions")));
 
 	/*
 	 * Also check for active uses of the relation in the current transaction,
@@ -2064,8 +2060,7 @@ MergeAttributes(List *schema, List *supers, bool istemp, bool isPartitioned,
 				ereport(ERROR,
 						(errcode(ERRCODE_DUPLICATE_COLUMN),
 						 errmsg("column \"%s\" duplicated",
-								coldef->colname),
-										   errOmitLocation(true)));
+								coldef->colname)));
 		}
 	}
 
@@ -2115,8 +2110,7 @@ MergeAttributes(List *schema, List *supers, bool istemp, bool isPartitioned,
 			ereport(ERROR,
 					(errcode(ERRCODE_DUPLICATE_TABLE),
 					 errmsg("inherited relation \"%s\" duplicated",
-							parent->relname),
-									   errOmitLocation(true)));
+							parent->relname)));
 
 		parentOids = lappend_oid(parentOids, RelationGetRelid(relation));
 
@@ -2185,8 +2179,7 @@ MergeAttributes(List *schema, List *supers, bool istemp, bool isPartitioned,
 							   attributeName),
 							 errdetail("%s versus %s",
 									   TypeNameToString(def->typname),
-									   format_type_be(attribute->atttypid)),
-											   errOmitLocation(true)));
+									   format_type_be(attribute->atttypid))));
 				def->inhcount++;
 				/* Merge of NOT NULL constraints = OR 'em together */
 				def->is_not_null |= attribute->attnotnull;
@@ -2884,8 +2877,7 @@ renameatt(Oid myrelid,
 		ereport(ERROR,
 				(errcode(ERRCODE_UNDEFINED_COLUMN),
 				 errmsg("column \"%s\" does not exist",
-						oldattname),
-				 errOmitLocation(true)));
+						oldattname)));
 	attform = (Form_pg_attribute) GETSTRUCT(atttup);
 
 	attnum = attform->attnum;
@@ -2918,8 +2910,7 @@ renameatt(Oid myrelid,
 		ereport(ERROR,
 				(errcode(ERRCODE_DUPLICATE_COLUMN),
 				 errmsg("column \"%s\" of relation \"%s\" already exists",
-					  newattname, RelationGetRelationName(targetrelation)),
-				 errOmitLocation(true)));
+					  newattname, RelationGetRelationName(targetrelation))));
 	}
 	namestrcpy(&(attform->attname), newattname);
 
@@ -3064,8 +3055,7 @@ renamerel(Oid myrelid, const char *newrelname, RenameStmt *stmt)
 				errhint("Table \"%s\" is a child partition of table "
 						"\"%s\".  To rename it, use ALTER TABLE \"%s\"%s...",
 						get_rel_name(myrelid), get_rel_name(master),
-						get_rel_name(master), pretty ? pretty : "" ),
-				errOmitLocation(true)));
+						get_rel_name(master), pretty ? pretty : "" )));
 	}
 
 	pg_class_desc = heap_open(RelationRelationId, RowExclusiveLock);
@@ -3104,8 +3094,7 @@ renamerel(Oid myrelid, const char *newrelname, RenameStmt *stmt)
 		ereport(ERROR,
 				(errcode(ERRCODE_DUPLICATE_TABLE),
 				 errmsg("relation \"%s\" already exists",
-						newrelname),
-				 errOmitLocation(true)));
+						newrelname)));
 
 	/*
 	 * Update pg_class tuple with new relname.  (Scribbling on tuple is OK
@@ -3210,8 +3199,7 @@ renamerel(Oid myrelid, const char *newrelname, RenameStmt *stmt)
 							 errmsg("renamed %d partitions, "
 									"skipped %d child partitions "
 									"due to name truncation",
-									renamed, skipped),
-							 errOmitLocation(true)));
+									renamed, skipped)));
 				}
 			}
 		}
@@ -3522,8 +3510,7 @@ void ATVerifyObject(AlterTableStmt *stmt, Relation rel)
 		ereport(ERROR,
 				(errcode(ERRCODE_WRONG_OBJECT_TYPE),
 				 errmsg("\"%s\" is a foreign table", RelationGetRelationName(rel)),
-				 errhint("Use ALTER FOREIGN TABLE instead"),
-				 errOmitLocation(true)));
+				 errhint("Use ALTER FOREIGN TABLE instead")));
 	}
 	else if (RelationIsExternal(rel) && stmt->relkind != OBJECT_EXTTABLE)
 	{
@@ -3538,8 +3525,7 @@ void ATVerifyObject(AlterTableStmt *stmt, Relation rel)
 		ereport(ERROR,
 				(errcode(ERRCODE_WRONG_OBJECT_TYPE),
 				 errmsg("\"%s\" is a base table", RelationGetRelationName(rel)),
-				 errhint("Use ALTER TABLE instead"),
-				 errOmitLocation(true)));
+				 errhint("Use ALTER TABLE instead")));
 	}
 	
 	/*
@@ -4132,6 +4118,7 @@ ATPrepCmd(List **wqueue, Relation rel, AlterTableCmd *cmd,
 			 * test that this is allowed for partitioning, but only if we aren't
 			 * recursing.
 			 */
+			ATExternalPartitionCheck(cmd->subtype, rel, recursing);
 			ATPartitionCheck(cmd->subtype, rel, false, recursing);
 			/* Performs own recursion */
 			ATPrepAddColumn(rel, recurse, cmd);
@@ -4159,6 +4146,7 @@ ATPrepCmd(List **wqueue, Relation rel, AlterTableCmd *cmd,
 			break;
 		case AT_DropNotNull:	/* ALTER COLUMN DROP NOT NULL */
 			ATSimplePermissions(rel, false);
+			ATExternalPartitionCheck(cmd->subtype, rel, recursing);
 			ATPartitionCheck(cmd->subtype, rel, false, recursing);
 			ATSimpleRecursion(wqueue, rel, cmd, recurse);
 			/* No command-specific prep needed */
@@ -4166,6 +4154,7 @@ ATPrepCmd(List **wqueue, Relation rel, AlterTableCmd *cmd,
 			break;
 		case AT_SetNotNull:		/* ALTER COLUMN SET NOT NULL */
 			ATSimplePermissions(rel, false);
+			ATExternalPartitionCheck(cmd->subtype, rel, recursing);
 			ATSimpleRecursion(wqueue, rel, cmd, recurse);
 			if (!cmd->part_expanded)
 				ATPartitionCheck(cmd->subtype, rel, false, recursing);
@@ -4187,6 +4176,7 @@ ATPrepCmd(List **wqueue, Relation rel, AlterTableCmd *cmd,
 		case AT_DropColumn:		/* DROP COLUMN */
 		case AT_DropColumnRecurse:
 			ATSimplePermissions(rel, false);
+			ATExternalPartitionCheck(cmd->subtype, rel, recursing);
 			ATPartitionCheck(cmd->subtype, rel, false, recursing);
 			/* Recursion occurs during execution phase */
 			/* No command-specific prep needed except saving recurse flag */
@@ -4199,6 +4189,7 @@ ATPrepCmd(List **wqueue, Relation rel, AlterTableCmd *cmd,
 					(errcode(ERRCODE_CDB_FEATURE_NOT_YET),
 					 errmsg("ALTER TABLE ... ADD INDEX is not supported")));
 			ATSimplePermissions(rel, false);
+			ATExternalPartitionCheck(cmd->subtype, rel, recursing);
 			/* Any recursion for partitioning is done in ATExecAddIndex() itself */
 			/* However, if the index supports a PK or UNIQUE constraint and the
 			 * relation is partitioned, we need to assure the constraint is named
@@ -4257,6 +4248,7 @@ ATPrepCmd(List **wqueue, Relation rel, AlterTableCmd *cmd,
 			 * We allow operations on the root of a partitioning hierarchy, but
 			 * not ONLY the root.
 			 */
+			ATExternalPartitionCheck(cmd->subtype, rel, recursing);
 			ATPartitionCheck(cmd->subtype, rel, (!recurse && !recursing), recursing);
 			/*
 			 * Currently we recurse only for CHECK constraints, never for
@@ -4281,6 +4273,7 @@ ATPrepCmd(List **wqueue, Relation rel, AlterTableCmd *cmd,
 			 * We allow operations on the root of a partitioning hierarchy, but
 			 * not ONLY the root.
 			 */
+			ATExternalPartitionCheck(cmd->subtype, rel, recursing);
 			ATPartitionCheck(cmd->subtype, rel, (!recurse && !recursing), recursing);
 			/* Performs own recursion */
 			ATPrepDropConstraint(wqueue, rel, recurse, cmd);
@@ -4294,6 +4287,7 @@ ATPrepCmd(List **wqueue, Relation rel, AlterTableCmd *cmd,
 			break;
 		case AT_AlterColumnType:		/* ALTER COLUMN TYPE */
 			ATSimplePermissions(rel, false);
+			ATExternalPartitionCheck(cmd->subtype, rel, recursing);
 			ATPartitionCheck(cmd->subtype, rel, false, recursing);
 			/* Performs own recursion */
 			ATPrepAlterColumnType(wqueue, tab, rel, recurse, recursing, cmd);
@@ -4408,6 +4402,8 @@ ATPrepCmd(List **wqueue, Relation rel, AlterTableCmd *cmd,
 				Oid relid = RelationGetRelid(rel);
 				PartStatus ps = rel_part_status(relid);
 
+				ATExternalPartitionCheck(cmd->subtype, rel, recursing);
+
 				if ( recurse ) /* Normal ALTER TABLE */
 				{
 					switch (ps)
@@ -4451,8 +4447,7 @@ ATPrepCmd(List **wqueue, Relation rel, AlterTableCmd *cmd,
 									 errhint("Distribution policy may be set "
 											 "for an entire partitioned table"
 											 " or one of its leaf parts."
-											 ),
-									 errOmitLocation(true)));
+											 )));
 							break; /* tidy */
 					}
 				}
@@ -4479,8 +4474,7 @@ ATPrepCmd(List **wqueue, Relation rel, AlterTableCmd *cmd,
 											RelationGetRelationName(rel)),
 									 errhint("Leaf distribution policy must be"
 											 " random or match that of the"
-											 " entire partitioned table."),
-									 errOmitLocation(true)
+											 " entire partitioned table.")
 									 ));
 						heap_close(ptrel, AccessShareLock);
 					}
@@ -4679,8 +4673,7 @@ ATPrepCmd(List **wqueue, Relation rel, AlterTableCmd *cmd,
 							(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
 							 errmsg("cannot split partition with child "
 									"partitions"),
-							 errhint("Try splitting the child partitions."),
-							 errOmitLocation(true)));
+							 errhint("Try splitting the child partitions.")));
 
 				target = heap_open(prule1->topRule->parchildrelid,
 								   AccessExclusiveLock);
@@ -4695,8 +4688,7 @@ ATPrepCmd(List **wqueue, Relation rel, AlterTableCmd *cmd,
 					ereport(ERROR,
 							(errcode(ERRCODE_SYNTAX_ERROR),
 							 errmsg("AT clause cannot be used when splitting "
-									"a default RANGE partition"),
-							 errOmitLocation(true)));
+									"a default RANGE partition")));
 				}
 				else if (prule1->pNode->part->parkind == 'l' && !is_at)
 				{
@@ -4704,8 +4696,7 @@ ATPrepCmd(List **wqueue, Relation rel, AlterTableCmd *cmd,
 							(errcode(ERRCODE_SYNTAX_ERROR),
 							 errmsg("cannot SPLIT DEFAULT PARTITION "
 									"with LIST"),
-							errhint("Use SPLIT with the AT clause instead."),
-							errOmitLocation(true)));
+							errhint("Use SPLIT with the AT clause instead.")));
 
 				}
 
@@ -4713,8 +4704,7 @@ ATPrepCmd(List **wqueue, Relation rel, AlterTableCmd *cmd,
 					ereport(ERROR,
 							(errcode(ERRCODE_WRONG_OBJECT_TYPE),
 							 errmsg("SPLIT is not supported for "
-									"HASH partitions"),
-							 errOmitLocation(true)));
+									"HASH partitions")));
 
 				if (linitial((List *)pc->arg1))
 					is_at = false;
@@ -4780,8 +4770,7 @@ ATPrepCmd(List **wqueue, Relation rel, AlterTableCmd *cmd,
 											parnatts,
 											parnatts > 1 ? "s" : "",
 											list_length(vals),
-										   list_length(vals) > 1 ? "s" : ""),
-									  errOmitLocation(true)));
+										   list_length(vals) > 1 ? "s" : "")));
 						}
 
 						vals = (List *)transformExpressionList(pstate, vals);
@@ -4929,8 +4918,7 @@ ATPrepCmd(List **wqueue, Relation rel, AlterTableCmd *cmd,
 										(errcode(ERRCODE_WRONG_OBJECT_TYPE),
 										errmsg("AT clause parameter is not "
 											   "a member of the target "
-											   "partition specification"),
-										errOmitLocation(true)));
+											   "partition specification")));
 
 
 						}
@@ -4940,8 +4928,7 @@ ATPrepCmd(List **wqueue, Relation rel, AlterTableCmd *cmd,
 									(errcode(ERRCODE_SYNTAX_ERROR),
 									 errmsg("AT clause cannot contain all "
 											"values in partition%s",
-											prule1->partIdStr),
-									 errOmitLocation(true)));
+											prule1->partIdStr)));
 
 					}
 				}
@@ -5025,8 +5012,7 @@ ATPrepCmd(List **wqueue, Relation rel, AlterTableCmd *cmd,
 									(errcode(ERRCODE_WRONG_OBJECT_TYPE),
 									errmsg("AT clause parameter is not "
 										   "a member of the target "
-										   "partition specification"),
-									errOmitLocation(true)));
+										   "partition specification")));
 						}
 					}
 				}
@@ -5054,8 +5040,7 @@ ATPrepCmd(List **wqueue, Relation rel, AlterTableCmd *cmd,
 						ereport(ERROR,
 								(errcode(ERRCODE_DUPLICATE_OBJECT),
 								 errmsg("both INTO partitions "
-										"already exist"),
-								 errOmitLocation(true)));
+										"already exist")));
 					}
 					else if (prule1->topRule->parisdefault &&
 							 !prule2 && !prule3)
@@ -5063,8 +5048,7 @@ ATPrepCmd(List **wqueue, Relation rel, AlterTableCmd *cmd,
 						ereport(ERROR,
 								(errcode(ERRCODE_SYNTAX_ERROR),
 								 errmsg("default partition name missing "
-										"from INTO clause"),
-								 errOmitLocation(true)));
+										"from INTO clause")));
 
 					}
 				}
@@ -5109,8 +5093,7 @@ ATPrepCmd(List **wqueue, Relation rel, AlterTableCmd *cmd,
 				{
 					ereport(ERROR,
 							(errcode(ERRCODE_DUPLICATE_OBJECT),
-							 errmsg("cannot split into an existing partition"),
-							 errOmitLocation(true)));
+							 errmsg("cannot split into an existing partition")));
 				}
 				
 				ATSimplePermissions(target, false);
@@ -5569,6 +5552,12 @@ ATRewriteTables(List **wqueue,
 
 		/* We will lock the table iff we decide to actually rewrite it */
 		rel = relation_open(tab->relid, NoLock);
+		if (RelationIsExternal(rel) || RelationIsForeign(rel))
+		{
+			heap_close(rel, NoLock);
+			continue;
+		}
+
 		relisshared   = rel->rd_rel->relisshared;
 		relisnailed   = rel->rd_isnailed;
 		relNamespace  = RelationGetNamespace(rel);
@@ -5924,7 +5913,7 @@ ATRewriteTable(AlteredTableInfo *tab, Oid OIDNewHeap)
 		 * Scan through the rows, generating a new row if needed and then
 		 * checking all the constraints.
 		 */
-		if(relstorage == RELSTORAGE_HEAP)
+		if(relstorage == RELSTORAGE_HEAP) 
 		{
 			heapscan = heap_beginscan(oldrel, SnapshotNow, 0, NULL);
 
@@ -6128,8 +6117,7 @@ ATRewriteTable(AlteredTableInfo *tab, Oid OIDNewHeap)
 						ereport(ERROR,
 								(errcode(ERRCODE_NOT_NULL_VIOLATION),
 								 errmsg("column \"%s\" contains null values",
-										NameStr(newTupDesc->attrs[attn]->attname)),
-								 errOmitLocation(true)));
+										NameStr(newTupDesc->attrs[attn]->attname))));
 				}
 
 				foreach(l, tab->constraints)
@@ -6143,8 +6131,7 @@ ATRewriteTable(AlteredTableInfo *tab, Oid OIDNewHeap)
 								ereport(ERROR,
 										(errcode(ERRCODE_CHECK_VIOLATION),
 										 errmsg("check constraint \"%s\" is violated by some row",
-												con->name),
-										 errOmitLocation(true)));
+												con->name)));
 							break;
 						case CONSTR_FOREIGN:
 							/* Nothing to do here */
@@ -6285,8 +6272,7 @@ ATRewriteTable(AlteredTableInfo *tab, Oid OIDNewHeap)
 										(errcode(ERRCODE_CHECK_VIOLATION),
 										 errmsg("check constraint \"%s\" is violated",
 												con->name
-											 ),
-										 errOmitLocation(true)));
+											 )));
 							break;
 						case CONSTR_FOREIGN:
 							/* Nothing to do */
@@ -6540,6 +6526,30 @@ ATPartitionCheck(AlterTableType subtype, Relation rel, bool rejectroot, bool rec
 }
 
 /*
+ * ATExternalPartitionCheck
+ * Reject certain operations if the partitioned table has external partition.
+ */
+static void
+ATExternalPartitionCheck(AlterTableType subtype, Relation rel, bool recursing)
+{
+	if (recursing)
+	{
+		return;
+	}
+
+	Oid relid = RelationGetRelid(rel);
+	if (rel_has_external_partition(relid))
+	{
+		ereport(ERROR,
+				(errcode(ERRCODE_WRONG_OBJECT_TYPE),
+				 errmsg("Cannot %s \"%s\"; it has external partition(s)",
+						alterTableCmdString(subtype),
+						RelationGetRelationName(rel)),
+				 errOmitLocation(true)));
+	}
+}
+
+/*
  * ATSimplePermissions
  *
  * - Ensure that it is a relation (or possibly a view)
@@ -6557,8 +6567,7 @@ ATSimplePermissions(Relation rel, bool allowView)
 				ereport(ERROR,
 						(errcode(ERRCODE_WRONG_OBJECT_TYPE),
 						 errmsg("\"%s\" is not a table or view",
-								RelationGetRelationName(rel)),
-						 errOmitLocation(true)));
+								RelationGetRelationName(rel))));
 		}
 		else if (!IsUnderPostmaster &&
 				 (rel->rd_rel->relkind == RELKIND_AOSEGMENTS ||
@@ -6573,8 +6582,7 @@ ATSimplePermissions(Relation rel, bool allowView)
 			ereport(ERROR,
 					(errcode(ERRCODE_WRONG_OBJECT_TYPE),
 					 errmsg("\"%s\" is not a table",
-							RelationGetRelationName(rel)),
-					 errOmitLocation(true)));
+							RelationGetRelationName(rel))));
 	}
 
 	/* Permissions checks */
@@ -6586,8 +6594,7 @@ ATSimplePermissions(Relation rel, bool allowView)
 		ereport(ERROR,
 				(errcode(ERRCODE_INSUFFICIENT_PRIVILEGE),
 				 errmsg("permission denied: \"%s\" is a system catalog",
-						RelationGetRelationName(rel)),
-								   errOmitLocation(true)));
+						RelationGetRelationName(rel))));
 }
 
 /*
@@ -6605,8 +6612,7 @@ ATSimplePermissionsRelationOrIndex(Relation rel)
 		ereport(ERROR,
 				(errcode(ERRCODE_WRONG_OBJECT_TYPE),
 				 errmsg("\"%s\" is not a table or index",
-						RelationGetRelationName(rel)),
-				 errOmitLocation(true)));
+						RelationGetRelationName(rel))));
 
 	/* Permissions checks */
 	if (!pg_class_ownercheck(RelationGetRelid(rel), GetUserId()))
@@ -6756,16 +6762,14 @@ find_composite_type_dependencies(Oid typeOid,
 						 errmsg("cannot alter table \"%s\" because column \"%s\".\"%s\" uses its rowtype",
 								origTblName,
 								RelationGetRelationName(rel),
-								NameStr(att->attname)),
-										   errOmitLocation(true)));
+								NameStr(att->attname))));
 			else
 				ereport(ERROR,
 						(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
 						 errmsg("cannot alter type \"%s\" because column \"%s\".\"%s\" uses it",
 								origTypeName,
 								RelationGetRelationName(rel),
-								NameStr(att->attname)),
-										   errOmitLocation(true)));
+								NameStr(att->attname))));
 		}
 		else if (OidIsValid(rel->rd_rel->reltype))
 		{
@@ -6851,6 +6855,11 @@ ATPrepAddColumn(Relation rel, bool recurse, AlterTableCmd *cmd)
 				continue;
 
 			childrel = heap_open(childrelid, AccessShareLock);
+			if (RelationIsExternal(childrel))
+			{
+				heap_close(childrel, NoLock);
+				continue;
+			}
 			CheckTableNotInUse(childrel, "ALTER TABLE");
 
 			/* Recurse to child */
@@ -6930,8 +6939,7 @@ ATExecAddColumn(AlteredTableInfo *tab, Relation rel,
 		ereport(ERROR,
 				(errcode(ERRCODE_GP_FEATURE_NOT_YET),
 				 errmsg("ADD COLUMN with no default value in append-only tables"
-						" is not yet supported."),
-								   errOmitLocation(true)
+						" is not yet supported.")
                 ));
 	}
 
@@ -6966,8 +6974,7 @@ ATExecAddColumn(AlteredTableInfo *tab, Relation rel,
 				ereport(ERROR,
 						(errcode(ERRCODE_DATATYPE_MISMATCH),
 						 errmsg("child table \"%s\" has different type for column \"%s\"",
-							RelationGetRelationName(rel), colDef->colname),
-									   errOmitLocation(true)));
+							RelationGetRelationName(rel), colDef->colname)));
 
 			/* Bump the existing child att's inhcount */
 			childatt->attinhcount++;
@@ -6981,15 +6988,13 @@ ATExecAddColumn(AlteredTableInfo *tab, Relation rel,
 			{
 				ereport(DEBUG1,
 			  (errmsg("merging definition of column \"%s\" for child \"%s\"",
-					  colDef->colname, RelationGetRelationName(rel)),
-							   errOmitLocation(true)));
+					  colDef->colname, RelationGetRelationName(rel))));
 
 			}
 			else
 			ereport(NOTICE,
 			  (errmsg("merging definition of column \"%s\" for child \"%s\"",
-					  colDef->colname, RelationGetRelationName(rel)),
-							   errOmitLocation(true)));
+					  colDef->colname, RelationGetRelationName(rel))));
 
 			heap_close(attrdesc, RowExclusiveLock);
 			return;
@@ -7034,8 +7039,7 @@ ATExecAddColumn(AlteredTableInfo *tab, Relation rel,
 			ereport(ERROR,
 					(errcode(ERRCODE_DUPLICATE_COLUMN),
 					 errmsg("column \"%s\" of relation \"%s\" already exists",
-							colDef->colname, RelationGetRelationName(rel)),
-					 errOmitLocation(true)));
+							colDef->colname, RelationGetRelationName(rel))));
 		}
 	}
 	minattnum = ((Form_pg_class) GETSTRUCT(reltup))->relnatts;
@@ -7266,8 +7270,7 @@ ATExecDropNotNull(Relation rel, const char *colName)
 		ereport(ERROR,
 				(errcode(ERRCODE_UNDEFINED_COLUMN),
 				 errmsg("column \"%s\" of relation \"%s\" does not exist",
-						colName, RelationGetRelationName(rel)),
-				 errOmitLocation(true)));
+						colName, RelationGetRelationName(rel))));
 
 	attnum = ((Form_pg_attribute) GETSTRUCT(tuple))->attnum;
 
@@ -7318,8 +7321,7 @@ ATExecDropNotNull(Relation rel, const char *colName)
 					ereport(ERROR,
 							(errcode(ERRCODE_INVALID_TABLE_DEFINITION),
 							 errmsg("column \"%s\" is in a primary key",
-									colName),
-							 errOmitLocation(true)));
+									colName)));
 			}
 		}
 
@@ -7378,8 +7380,7 @@ ATExecSetNotNull(AlteredTableInfo *tab, Relation rel,
 		ereport(ERROR,
 				(errcode(ERRCODE_UNDEFINED_COLUMN),
 				 errmsg("column \"%s\" of relation \"%s\" does not exist",
-						colName, RelationGetRelationName(rel)),
-			     errOmitLocation(true)));
+						colName, RelationGetRelationName(rel))));
 
 	attnum = ((Form_pg_attribute) GETSTRUCT(tuple))->attnum;
 
@@ -7434,8 +7435,7 @@ ATExecColumnDefault(Relation rel, const char *colName,
 		ereport(ERROR,
 				(errcode(ERRCODE_UNDEFINED_COLUMN),
 				 errmsg("column \"%s\" of relation \"%s\" does not exist",
-						colName, RelationGetRelationName(rel)),
-				 errOmitLocation(true)));
+						colName, RelationGetRelationName(rel))));
 
 	/* Prevent them from altering a system attribute */
 	if (attnum <= 0)
@@ -7496,8 +7496,7 @@ ATPrepSetStatistics(Relation rel, const char *colName, Node *flagValue)
 		ereport(ERROR,
 				(errcode(ERRCODE_WRONG_OBJECT_TYPE),
 				 errmsg("\"%s\" is not a table or index",
-						RelationGetRelationName(rel)),
-				 errOmitLocation(true)));
+						RelationGetRelationName(rel))));
 
 	/* Permissions checks */
 	if (!pg_class_ownercheck(RelationGetRelid(rel), GetUserId()))
@@ -7620,8 +7619,7 @@ ATExecSetStorage(Relation rel, const char *colName, Node *newValue)
 		ereport(ERROR,
 				(errcode(ERRCODE_UNDEFINED_COLUMN),
 				 errmsg("column \"%s\" of relation \"%s\" does not exist",
-						colName, RelationGetRelationName(rel)),
-				 errOmitLocation(true)));
+						colName, RelationGetRelationName(rel))));
 	attrtuple = (Form_pg_attribute) GETSTRUCT(tuple);
 
 	if (attrtuple->attnum <= 0)
@@ -7708,16 +7706,14 @@ ATExecDropColumn(List **wqueue, Relation rel, const char *colName,
 		ereport(ERROR,
 				(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
 				 errmsg("cannot drop system column \"%s\"",
-						colName),
-								   errOmitLocation(true)));
+						colName)));
 
 	/* Don't drop inherited columns */
 	if (targetatt->attinhcount > 0 && !recursing)
 		ereport(ERROR,
 				(errcode(ERRCODE_INVALID_TABLE_DEFINITION),
 				 errmsg("cannot drop inherited column \"%s\"",
-						colName),
-								   errOmitLocation(true)));
+						colName)));
 
 	/* better not be a column we partition on */
 	pn = RelationBuildPartitionDesc(rel, false);
@@ -7729,8 +7725,7 @@ ATExecDropColumn(List **wqueue, Relation rel, const char *colName,
 			ereport(ERROR,
 					(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
 					 errmsg("cannot drop partitioning column \"%s\"",
-							colName),
-									   errOmitLocation(true)));
+							colName)));
 
 		/*
 		 * Remove any partition encoding entry
@@ -7757,8 +7752,7 @@ ATExecDropColumn(List **wqueue, Relation rel, const char *colName,
 						(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
 						 errmsg("Dropping a column that is part of the "
 								"distribution policy forces a "
-								"NULL distribution policy"),
-										   errOmitLocation(true)));
+								"NULL distribution policy")));
 			}
 		}
 	}
@@ -8100,8 +8094,7 @@ ATExecAddConstraint(AlteredTableInfo *tab, Relation rel, Node *newConstraint, bo
 								(errcode(ERRCODE_DUPLICATE_OBJECT),
 								 errmsg("constraint \"%s\" for relation \"%s\" already exists",
 										fkconstraint->constr_name,
-										RelationGetRelationName(rel)),
-												   errOmitLocation(true)));
+										RelationGetRelationName(rel))));
 				}
 				else
 					fkconstraint->constr_name =
@@ -8273,8 +8266,7 @@ ATAddForeignKeyConstraint(AlteredTableInfo *tab, Relation rel,
 		ereport(ERROR,
 				(errcode(ERRCODE_WRONG_OBJECT_TYPE),
 				 errmsg("referenced relation \"%s\" is not a table",
-						RelationGetRelationName(pkrel)),
-								   errOmitLocation(true)));
+						RelationGetRelationName(pkrel))));
 
 	aclresult = pg_class_aclcheck(RelationGetRelid(pkrel), GetUserId(),
 								  ACL_REFERENCES);
@@ -8286,8 +8278,7 @@ ATAddForeignKeyConstraint(AlteredTableInfo *tab, Relation rel,
 		ereport(ERROR,
 				(errcode(ERRCODE_INSUFFICIENT_PRIVILEGE),
 				 errmsg("permission denied: \"%s\" is a system catalog",
-						RelationGetRelationName(pkrel)),
-								   errOmitLocation(true)));
+						RelationGetRelationName(pkrel))));
 
 	aclresult = pg_class_aclcheck(RelationGetRelid(rel), GetUserId(),
 								  ACL_REFERENCES);
@@ -8308,16 +8299,14 @@ ATAddForeignKeyConstraint(AlteredTableInfo *tab, Relation rel,
 		if (!isTempNamespace(RelationGetNamespace(rel)))
 			ereport(ERROR,
 					(errcode(ERRCODE_INVALID_TABLE_DEFINITION),
-					 errmsg("cannot reference temporary table from permanent table constraint"),
-							   errOmitLocation(true)));
+					 errmsg("cannot reference temporary table from permanent table constraint")));
 	}
 	else
 	{
 		if (isTempNamespace(RelationGetNamespace(rel)))
 			ereport(ERROR,
 					(errcode(ERRCODE_INVALID_TABLE_DEFINITION),
-					 errmsg("cannot reference permanent table from temporary table constraint"),
-							   errOmitLocation(true)));
+					 errmsg("cannot reference permanent table from temporary table constraint")));
 	}
 	
 	/*
@@ -8328,8 +8317,7 @@ ATAddForeignKeyConstraint(AlteredTableInfo *tab, Relation rel,
 	{
 		ereport(ERROR,
 				(errcode(ERRCODE_INVALID_TABLE_DEFINITION),
-				 errmsg("cannot reference just part of a partitioned table"),
-				 errOmitLocation(true)));
+				 errmsg("cannot reference just part of a partitioned table")));
 	}
 
 	/*
@@ -8373,8 +8361,7 @@ ATAddForeignKeyConstraint(AlteredTableInfo *tab, Relation rel,
 	if (numfks != numpks)
 		ereport(ERROR,
 				(errcode(ERRCODE_INVALID_FOREIGN_KEY),
-				 errmsg("number of referencing and referenced columns for foreign key disagree"),
-						   errOmitLocation(true)));
+				 errmsg("number of referencing and referenced columns for foreign key disagree")));
 
 	for (i = 0; i < numpks; i++)
 	{
@@ -8404,8 +8391,7 @@ ATAddForeignKeyConstraint(AlteredTableInfo *tab, Relation rel,
 							   strVal(list_nth(fkconstraint->fk_attrs, i)),
 							   strVal(list_nth(fkconstraint->pk_attrs, i)),
 							   format_type_be(fktypoid[i]),
-							   format_type_be(pktypoid[i])),
-									   errOmitLocation(true)));
+							   format_type_be(pktypoid[i]))));
 
 		/*
 		 * Check that the found operator is compatible with the PK index, and
@@ -8422,8 +8408,7 @@ ATAddForeignKeyConstraint(AlteredTableInfo *tab, Relation rel,
 							   strVal(list_nth(fkconstraint->fk_attrs, i)),
 							   strVal(list_nth(fkconstraint->pk_attrs, i)),
 							   format_type_be(fktypoid[i]),
-							   format_type_be(pktypoid[i])),
-									   errOmitLocation(true)));
+							   format_type_be(pktypoid[i]))));
 
 		ReleaseOperator(o);
 	}
@@ -8511,8 +8496,7 @@ transformColumnNameList(Oid relId, List *colList,
 			ereport(ERROR,
 					(errcode(ERRCODE_UNDEFINED_COLUMN),
 					 errmsg("column \"%s\" referenced in foreign key constraint does not exist",
-							attname),
-									   errOmitLocation(true)));
+							attname)));
 		if (attnum >= INDEX_MAX_KEYS)
 			ereport(ERROR,
 					(errcode(ERRCODE_TOO_MANY_COLUMNS),
@@ -8598,8 +8582,7 @@ transformFkeyGetPrimaryKey(Relation pkrel, Oid *indexOid,
 		ereport(ERROR,
 				(errcode(ERRCODE_UNDEFINED_OBJECT),
 				 errmsg("there is no primary key for referenced table \"%s\"",
-						RelationGetRelationName(pkrel)),
-								   errOmitLocation(true)));
+						RelationGetRelationName(pkrel))));
 
 	/* Must get indclass the hard way */
 	indclassDatum = caql_getattr(pcqCtx,
@@ -8739,8 +8722,7 @@ transformFkeyCheckAttrs(Relation pkrel,
 		ereport(ERROR,
 				(errcode(ERRCODE_INVALID_FOREIGN_KEY),
 				 errmsg("there is no unique constraint matching given keys for referenced table \"%s\"",
-						RelationGetRelationName(pkrel)),
-								   errOmitLocation(true)));
+						RelationGetRelationName(pkrel))));
 
 	list_free(indexoidlist);
 
@@ -8895,8 +8877,7 @@ CreateFKCheckTrigger(Oid myRelOid, Oid refRelOid,
 	if (list_length(fkconstraint->fk_attrs) != list_length(fkconstraint->pk_attrs))
 		ereport(ERROR,
 				(errcode(ERRCODE_INVALID_FOREIGN_KEY),
-				 errmsg("number of referencing and referenced columns for foreign key disagree"),
-						   errOmitLocation(true)));
+				 errmsg("number of referencing and referenced columns for foreign key disagree")));
 
 	forboth(fk_attr, fkconstraint->fk_attrs,
 			pk_attr, fkconstraint->pk_attrs)
@@ -8941,8 +8922,7 @@ createForeignKeyTriggers(Relation rel, Oid refRelOid,
 		if (Gp_role == GP_ROLE_DISPATCH)
 			ereport(WARNING,
 				(errcode(ERRCODE_INVALID_TABLE_DEFINITION),
-				 errmsg("Referential integrity (FOREIGN KEY) constraints are not supported in Greenplum Database, will not be enforced."),
-						   errOmitLocation(true)));
+				 errmsg("Referential integrity (FOREIGN KEY) constraints are not supported in Greenplum Database, will not be enforced.")));
 	}
 
 	myRelOid = RelationGetRelid(rel);
@@ -9176,14 +9156,12 @@ ATExecDropConstraint(Relation rel, const char *constrName,
 			ereport(ERROR,
 					(errcode(ERRCODE_UNDEFINED_OBJECT),
 					 errmsg("constraint \"%s\" does not exist",
-							constrName),
-									   errOmitLocation(true)));
+							constrName)));
 		/* Otherwise if more than one constraint deleted, notify */
 		else if (deleted > 1 && Gp_role != GP_ROLE_EXECUTE)
 			ereport(NOTICE,
 					(errmsg("multiple constraints named \"%s\" were dropped",
-							constrName),
-									   errOmitLocation(true)));
+							constrName)));
 	}
 
 	/* MPP-6929: metadata tracking */
@@ -9226,8 +9204,7 @@ ATPrepAlterColumnType(List **wqueue,
 		ereport(ERROR,
 				(errcode(ERRCODE_UNDEFINED_COLUMN),
 				 errmsg("column \"%s\" of relation \"%s\" does not exist",
-						colName, RelationGetRelationName(rel)),
-								   errOmitLocation(true)));
+						colName, RelationGetRelationName(rel))));
 	attTup = (Form_pg_attribute) GETSTRUCT(tuple);
 	attnum = attTup->attnum;
 
@@ -9236,16 +9213,14 @@ ATPrepAlterColumnType(List **wqueue,
 		ereport(ERROR,
 				(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
 				 errmsg("cannot alter system column \"%s\"",
-						colName),
-								   errOmitLocation(true)));
+						colName)));
 
 	/* Don't alter inherited columns */
 	if (attTup->attinhcount > 0 && !recursing)
 		ereport(ERROR,
 				(errcode(ERRCODE_INVALID_TABLE_DEFINITION),
 				 errmsg("cannot alter inherited column \"%s\"",
-						colName),
-								   errOmitLocation(true)));
+						colName)));
 
 	/* Look up the target type */
 	targettype = typenameTypeId(NULL, typname);
@@ -9282,25 +9257,21 @@ ATPrepAlterColumnType(List **wqueue,
 		if (expression_returns_set(transform))
 			ereport(ERROR,
 					(errcode(ERRCODE_DATATYPE_MISMATCH),
-					 errmsg("transform expression must not return a set"),
-							   errOmitLocation(true)));
+					 errmsg("transform expression must not return a set")));
 
 		/* No subplans or aggregates, either... */
 		if (pstate->p_hasSubLinks)
 			ereport(ERROR,
 					(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
-					 errmsg("cannot use subquery in transform expression"),
-							   errOmitLocation(true)));
+					 errmsg("cannot use subquery in transform expression")));
 		if (pstate->p_hasAggs)
 			ereport(ERROR,
 					(errcode(ERRCODE_GROUPING_ERROR),
-			errmsg("cannot use aggregate function in transform expression"),
-					   errOmitLocation(true)));
+			errmsg("cannot use aggregate function in transform expression")));
 		if (pstate->p_hasWindFuncs)
 			ereport(ERROR,
 					(errcode(ERRCODE_SYNTAX_ERROR),
-			errmsg("cannot use window function in transform expression"),
-					   errOmitLocation(true)));
+			errmsg("cannot use window function in transform expression")));
 
 	}
 	else
@@ -9320,8 +9291,7 @@ ATPrepAlterColumnType(List **wqueue,
 		ereport(ERROR,
 				(errcode(ERRCODE_DATATYPE_MISMATCH),
 				 errmsg("column \"%s\" cannot be cast to type \"%s\"",
-						colName, TypeNameToString(typname)),
-								   errOmitLocation(true)));
+						colName, TypeNameToString(typname))));
 
 	free_parsestate(&pstate);
 
@@ -9349,8 +9319,7 @@ ATPrepAlterColumnType(List **wqueue,
 		ereport(ERROR,
 				(errcode(ERRCODE_INVALID_TABLE_DEFINITION),
 				 errmsg("type of inherited column \"%s\" must be changed in child tables too",
-						colName),
-								   errOmitLocation(true)));
+						colName)));
 }
 
 static void
@@ -9389,8 +9358,7 @@ ATExecAlterColumnType(AlteredTableInfo *tab, Relation rel,
 		ereport(ERROR,
 				(errcode(ERRCODE_UNDEFINED_COLUMN),
 				 errmsg("column \"%s\" of relation \"%s\" does not exist",
-						colName, RelationGetRelationName(rel)),
-								   errOmitLocation(true)));
+						colName, RelationGetRelationName(rel))));
 	attTup = (Form_pg_attribute) GETSTRUCT(heapTup);
 	attnum = attTup->attnum;
 
@@ -9400,8 +9368,7 @@ ATExecAlterColumnType(AlteredTableInfo *tab, Relation rel,
 		ereport(ERROR,
 				(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
 				 errmsg("cannot alter type of column \"%s\" twice",
-						colName),
-								   errOmitLocation(true)));
+						colName)));
 
 	/* Look up the target type (should not fail, since prep found it) */
 	typeTuple = typenameType(NULL, typname);
@@ -9460,8 +9427,7 @@ ATExecAlterColumnType(AlteredTableInfo *tab, Relation rel,
 			ereport(ERROR,
 					(errcode(ERRCODE_DATATYPE_MISMATCH),
 			errmsg("default for column \"%s\" cannot be cast to type \"%s\"",
-				   colName, TypeNameToString(typname)),
-						   errOmitLocation(true)));
+				   colName, TypeNameToString(typname))));
 	}
 	else
 		defaultexpr = NULL;
@@ -9538,8 +9504,7 @@ ATExecAlterColumnType(AlteredTableInfo *tab, Relation rel,
 										{
 											ereport(ERROR,
 													(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
-													 errmsg("Changing the type of a column that is part of the distribution policy and used in a unique index is not allowed"),
-															   errOmitLocation(true)));
+													 errmsg("Changing the type of a column that is part of the distribution policy and used in a unique index is not allowed")));
 										}
 									}
 								}
@@ -9587,8 +9552,7 @@ ATExecAlterColumnType(AlteredTableInfo *tab, Relation rel,
 								{
 									ereport(ERROR,
 											(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
-											 errmsg("Changing the type of a column that is used in a UNIQUE or PRIMARY KEY constraint is not allowed"),
-													   errOmitLocation(true)));
+											 errmsg("Changing the type of a column that is used in a UNIQUE or PRIMARY KEY constraint is not allowed")));
 								}
 							}
 						}
@@ -9631,8 +9595,7 @@ ATExecAlterColumnType(AlteredTableInfo *tab, Relation rel,
 						 errmsg("cannot alter type of a column used by a view or rule"),
 						 errdetail("%s depends on column \"%s\"",
 								   getObjectDescription(&foundObject),
-								   colName),
-										   errOmitLocation(true)));
+								   colName)));
 				break;
 
 			case OCLASS_DEFAULT:
@@ -9721,8 +9684,7 @@ ATExecAlterColumnType(AlteredTableInfo *tab, Relation rel,
 					ereport(ERROR,
 							(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
 							 errmsg("cannot alter type of a column used in "
-									"a partitioning key"),
-							 errOmitLocation(true)));
+									"a partitioning key")));
 			}
 
 			if (cdbRelSize(rel) != 0)
@@ -9733,8 +9695,7 @@ ATExecAlterColumnType(AlteredTableInfo *tab, Relation rel,
 						ereport(ERROR,
 								(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
 								 errmsg("cannot alter type of a column used in "
-										"a distribution policy"),
-								 errOmitLocation(true)));
+										"a distribution policy")));
 				}
 			}
 		}
@@ -10048,8 +10009,7 @@ ATExecChangeOwner(Oid relationOid, Oid newOwnerId, bool recursing)
 							(errcode(ERRCODE_WRONG_OBJECT_TYPE),
 							 errmsg("cannot change owner of index \"%s\"",
 									NameStr(tuple_class->relname)),
-							 errhint("Change the ownership of the index's table, instead."),
-									   errOmitLocation(true)));
+							 errhint("Change the ownership of the index's table, instead.")));
 				/* quick hack to exit via the no-op path */
 				newOwnerId = tuple_class->relowner;
 			}
@@ -10069,8 +10029,7 @@ ATExecChangeOwner(Oid relationOid, Oid newOwnerId, bool recursing)
 									NameStr(tuple_class->relname)),
 					  errdetail("Sequence \"%s\" is linked to table \"%s\".",
 								NameStr(tuple_class->relname),
-								get_rel_name(tableId)),
-										   errOmitLocation(true)));
+								get_rel_name(tableId))));
 			}
 			break;
 		case RELKIND_TOASTVALUE:
@@ -10084,8 +10043,7 @@ ATExecChangeOwner(Oid relationOid, Oid newOwnerId, bool recursing)
 			ereport(ERROR,
 					(errcode(ERRCODE_WRONG_OBJECT_TYPE),
 					 errmsg("\"%s\" is not a table, view, or sequence",
-							NameStr(tuple_class->relname)),
-									   errOmitLocation(true)));
+							NameStr(tuple_class->relname))));
 	}
 
 	/*
@@ -10319,8 +10277,7 @@ ATExecClusterOn(Relation rel, const char *indexName)
 		ereport(ERROR,
 				(errcode(ERRCODE_UNDEFINED_OBJECT),
 				 errmsg("index \"%s\" for table \"%s\" does not exist",
-						indexName, RelationGetRelationName(rel)),
-								   errOmitLocation(true)));
+						indexName, RelationGetRelationName(rel))));
 
 	/* Check index is valid to cluster on */
 	check_index_is_clusterable(rel, indexOid, false);
@@ -10400,8 +10357,7 @@ ATPrepSetTableSpace(AlteredTableInfo *tab, Relation rel, char *tablespacename)
 	if (OidIsValid(tab->newTableSpace))
 		ereport(ERROR,
 				(errcode(ERRCODE_SYNTAX_ERROR),
-				 errmsg("cannot have multiple SET TABLESPACE subcommands"),
-						   errOmitLocation(true)));
+				 errmsg("cannot have multiple SET TABLESPACE subcommands")));
 	tab->newTableSpace = tablespaceId;
 }
 
@@ -10441,8 +10397,7 @@ ATPartsPrepSetTableSpace(List **wqueue, Relation rel, AlterTableCmd *cmd, List *
 			ereport(ERROR,
 					(errcode(ERRCODE_SYNTAX_ERROR),
 					 errmsg("conflicting SET TABLESPACE subcommands for \"%s\"",
-							RelationGetRelationName(partrel)),
-					 errOmitLocation(true)));
+							RelationGetRelationName(partrel))));
 		
 		parttab->newTableSpace = tablespaceId;
 		parttab->subcmds[pass] = lappend(parttab->subcmds[pass], partcmd);
@@ -10536,8 +10491,7 @@ ATExecSetRelOptions(Relation rel, List *defList, bool isReset)
 				ereport(ERROR,
 						(errcode(ERRCODE_WRONG_OBJECT_TYPE),
 						 errmsg("altering reloptions for append only tables"
-								" is not permitted"),
-										   errOmitLocation(true)));
+								" is not permitted")));
 
 			(void) heap_reloptions(rel->rd_rel->relkind, newOptions, true);
 			break;
@@ -10548,8 +10502,7 @@ ATExecSetRelOptions(Relation rel, List *defList, bool isReset)
 			ereport(ERROR,
 					(errcode(ERRCODE_WRONG_OBJECT_TYPE),
 					 errmsg("\"%s\" is not a table, index, or TOAST table",
-							RelationGetRelationName(rel)),
-									   errOmitLocation(true)));
+							RelationGetRelationName(rel))));
 			break;
 	}
 
@@ -11101,8 +11054,7 @@ ATExecSetTableSpace_Relation(Oid tableOid, Oid newTableSpace, Oid newrelfilenode
 		ereport(ERROR,
 				(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
 				 errmsg("cannot move system relation \"%s\"",
-						RelationGetRelationName(rel)),
-								   errOmitLocation(true)));
+						RelationGetRelationName(rel))));
 
 	/*
 	 * Don't allow moving temp tables of other backends ... their local buffer
@@ -11111,8 +11063,7 @@ ATExecSetTableSpace_Relation(Oid tableOid, Oid newTableSpace, Oid newrelfilenode
 	if (isOtherTempNamespace(RelationGetNamespace(rel)))
 		ereport(ERROR,
 				(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
-				 errmsg("cannot move temporary tables of other sessions"),
-						   errOmitLocation(true)));
+				 errmsg("cannot move temporary tables of other sessions")));
 
 	/*
 	 * No work if no change in tablespace.
@@ -11505,8 +11456,7 @@ inherit_parent(Relation parent_rel, Relation child_rel, bool is_partition, List 
 			ereport(ERROR,
 					(errcode(ERRCODE_DUPLICATE_TABLE),
 					 errmsg("inherited relation \"%s\" duplicated",
-							RelationGetRelationName(parent_rel)),
-									   errOmitLocation(true)));
+							RelationGetRelationName(parent_rel))));
 		if (inh->inhseqno > inhseqno)
 			inhseqno = inh->inhseqno;
 	}
@@ -11532,8 +11482,7 @@ inherit_parent(Relation parent_rel, Relation child_rel, bool is_partition, List 
 				 errmsg("circular inheritance not allowed"),
 				 errdetail("\"%s\" is already a child of \"%s\".",
 						   RelationGetRelationName(parent_rel),
-						   RelationGetRelationName(child_rel)),
-								   errOmitLocation(true)));
+						   RelationGetRelationName(child_rel))));
 
 	/* If parent has OIDs then child must have OIDs */
 	if (parent_rel->rd_rel->relhasoids && !child_rel->rd_rel->relhasoids)
@@ -11541,8 +11490,7 @@ inherit_parent(Relation parent_rel, Relation child_rel, bool is_partition, List 
 				(errcode(ERRCODE_WRONG_OBJECT_TYPE),
 				 errmsg("table \"%s\" without OIDs cannot inherit from table \"%s\" with OIDs",
 						RelationGetRelationName(child_rel),
-						RelationGetRelationName(parent_rel)),
-								   errOmitLocation(true)));
+						RelationGetRelationName(parent_rel))));
 
 	/* Match up the columns and bump attinhcount and attislocal */
 	MergeAttributesIntoExisting(child_rel, parent_rel, inhAttrNameList, is_partition);
@@ -11618,8 +11566,7 @@ ATExecAddInherit(Relation child_rel, Node *node)
 		ereport(ERROR,
 				(errcode(ERRCODE_WRONG_OBJECT_TYPE),
 				 errmsg("cannot inherit from temporary relation \"%s\"",
-						RelationGetRelationName(parent_rel)),
-								   errOmitLocation(true)));
+						RelationGetRelationName(parent_rel))));
 
 	if (is_partition)
 	{
@@ -11753,8 +11700,7 @@ MergeAttributesIntoExisting(Relation child_rel, Relation parent_rel, List *inhAt
 					(errcode(ERRCODE_UNDEFINED_COLUMN),
 					errmsg("column \"%s\" does not exist in parent table \"%s\"",
 							inhAttrName,
-							RelationGetRelationName(parent_rel)),
-									   errOmitLocation(true)));
+							RelationGetRelationName(parent_rel))));
 	}
 
 	for (parent_attno = 1; parent_attno <= parent_natts; parent_attno++)
@@ -11781,15 +11727,13 @@ MergeAttributesIntoExisting(Relation child_rel, Relation parent_rel, List *inhAt
 						(errcode(ERRCODE_DATATYPE_MISMATCH),
 						 errmsg("child table \"%s\" has different type for column \"%s\"",
 								RelationGetRelationName(child_rel),
-								attributeName),
-										   errOmitLocation(true)));
+								attributeName)));
 
 			if (attribute->attnotnull && !childatt->attnotnull)
 				ereport(ERROR,
 						(errcode(ERRCODE_DATATYPE_MISMATCH),
 					  errmsg("column \"%s\" in child table must be marked NOT NULL",
-							 attributeName),
-									   errOmitLocation(true)));
+							 attributeName)));
 
 			/*
 			 * OK, bump the child column's inheritance count.  (If we fail
@@ -11832,8 +11776,7 @@ MergeAttributesIntoExisting(Relation child_rel, Relation parent_rel, List *inhAt
 			ereport(ERROR,
 					(errcode(ERRCODE_DATATYPE_MISMATCH),
 					 errmsg("child table is missing column \"%s\"",
-							attributeName),
-									   errOmitLocation(true)));
+							attributeName)));
 		}
 	}
 
@@ -11924,8 +11867,7 @@ MergeConstraintsIntoExisting(Relation child_rel, Relation parent_rel)
 			ereport(ERROR,
 					(errcode(ERRCODE_DATATYPE_MISMATCH),
 					 errmsg("child table is missing constraint \"%s\"",
-							NameStr(parent_con->conname)),
-									   errOmitLocation(true)));
+							NameStr(parent_con->conname))));
 
 		if (parent_con->condeferrable != child_con->condeferrable ||
 			parent_con->condeferred != child_con->condeferred ||
@@ -11934,8 +11876,7 @@ MergeConstraintsIntoExisting(Relation child_rel, Relation parent_rel)
 			ereport(ERROR,
 					(errcode(ERRCODE_DATATYPE_MISMATCH),
 					 errmsg("constraint definition for check constraint \"%s\" does not match",
-							NameStr(parent_con->conname)),
-									   errOmitLocation(true)));
+							NameStr(parent_con->conname))));
 
 		/*
 		 * TODO: add conislocal,coninhcount to constraints. This is where we
@@ -12018,8 +11959,7 @@ ATExecDropInherit(Relation rel, RangeVar *parent, bool is_partition)
 				(errcode(ERRCODE_UNDEFINED_TABLE),
 				 errmsg("relation \"%s\" is not a parent of relation \"%s\"",
 						RelationGetRelationName(parent_rel),
-						RelationGetRelationName(rel)),
-								   errOmitLocation(true)));
+						RelationGetRelationName(rel))));
 
 	/*
 	 * Search through child columns looking for ones matching parent rel
@@ -12893,8 +12833,7 @@ ATExecSetDistributedBy(Relation rel, Node *node, AlterTableCmd *cmd)
 		ereport(ERROR,
 				(errcode(ERRCODE_INSUFFICIENT_PRIVILEGE),
 				 errmsg("permission denied: \"%s\" is a system catalog",
-						RelationGetRelationName(rel)),
-								   errOmitLocation(true)));
+						RelationGetRelationName(rel))));
 
 	Assert(PointerIsValid(node));
 	Assert(IsA(node, List));
@@ -12920,8 +12859,7 @@ ATExecSetDistributedBy(Relation rel, Node *node, AlterTableCmd *cmd)
 			ereport(ERROR,
 					(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
 					 errmsg("%s not supported on non-distributed tables",
-							ldistro ? "SET DISTRIBUTED BY" : "SET WITH"),
-									   errOmitLocation(true)));
+							ldistro ? "SET DISTRIBUTED BY" : "SET WITH")));
 	}
 
 	if (Gp_role == GP_ROLE_DISPATCH)
@@ -13055,8 +12993,7 @@ ATExecSetDistributedBy(Relation rel, Node *node, AlterTableCmd *cmd)
 				ereport(ERROR,
 						(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
 						 errmsg("%s must be set to true when changing storage "
-								 "type", reorg_str),
-										   errOmitLocation(true)));
+								 "type", reorg_str)));
 
 			newOptions = new_rel_opts(rel, lwith);
 			
@@ -13088,8 +13025,7 @@ ATExecSetDistributedBy(Relation rel, Node *node, AlterTableCmd *cmd)
 									 "SET WITH (REORGANIZE=TRUE) "
 									 "DISTRIBUTED RANDOMLY "
 									 "to force a random redistribution",
-									 RelationGetRelationName(rel)),
-											   errOmitLocation(true)));
+									 RelationGetRelationName(rel))));
 			}
 
 			policy = (GpPolicy *) palloc(sizeof(GpPolicy));
@@ -13163,16 +13099,14 @@ ATExecSetDistributedBy(Relation rel, Node *node, AlterTableCmd *cmd)
 									 errmsg("distribution policy must be a "
 											"unique set of columns"),
 									 errhint("Column \"%s\" appears "
-											 "more than once", colName),
-													   errOmitLocation(true)));
+											 "more than once", colName)));
 					if (!HeapTupleIsValid(tuple))
 							ereport(ERROR,
 									(errcode(ERRCODE_UNDEFINED_COLUMN),
 									 errmsg("column \"%s\" of "
 											"relation \"%s\" does not exist",
 											colName,
-											RelationGetRelationName(rel)),
-													   errOmitLocation(true)));
+											RelationGetRelationName(rel))));
 
 					attnum = ((Form_pg_attribute) GETSTRUCT(tuple))->attnum;
 
@@ -13181,8 +13115,7 @@ ATExecSetDistributedBy(Relation rel, Node *node, AlterTableCmd *cmd)
 					ereport(ERROR,
 							(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
 						    errmsg("cannot distribute by system column \"%s\"",
-									colName),
-											   errOmitLocation(true)));
+									colName)));
 
 					policy->attrs[policy->nattrs++] = attnum;
 
@@ -13235,8 +13168,7 @@ ATExecSetDistributedBy(Relation rel, Node *node, AlterTableCmd *cmd)
 									 "DISTRIBUTED BY (%s) "
 									 "to force redistribution",
 									 RelationGetRelationName(rel),
-									 dist),
-											   errOmitLocation(true)));
+									 dist)));
 						heap_close(rel, NoLock);
 						/* Tell QEs to do nothing */
 						linitial(lprime) = NULL;
@@ -13713,8 +13645,7 @@ ATPExecPartAdd(AlteredTableInfo *tab,
 	if (!pNode)
 		ereport(ERROR,
 				(errcode(ERRCODE_UNDEFINED_OBJECT),
-				 errmsg("%s is not partitioned", lrelname),
-				 errOmitLocation(true)));
+				 errmsg("%s is not partitioned", lrelname)));
 
 	switch (pNode->part->parkind)
 	{
@@ -13748,8 +13679,7 @@ ATPExecPartAdd(AlteredTableInfo *tab,
 						namBuf,
 						lrelname),
 				 errhint("recreate the table to increase the "
-						 "number of partitions"),
-								   errOmitLocation(true)));
+						 "number of partitions")));
 
 
 	/* partition must have a valid name */
@@ -13760,8 +13690,7 @@ ATPExecPartAdd(AlteredTableInfo *tab,
 				 errmsg("cannot ADD partition%s to %s by rank or value",
 						namBuf,
 						lrelname),
-					 errhint("use a named partition"),
-							   errOmitLocation(true)));
+					 errhint("use a named partition")));
 
 	PartitionElem *pElem = (PartitionElem *) pc2->arg1;
 	Node *pStoreAttr = pElem->storeAttr;
@@ -13804,8 +13733,7 @@ ATPExecPartAdd(AlteredTableInfo *tab,
 						lrelname,
 						pNode->default_part->parname),
 				 errhint("need to SPLIT partition \"%s\"",
-						 pNode->default_part->parname),
-								   errOmitLocation(true)));
+						 pNode->default_part->parname)));
 
 		if (isDefault && !is_split)
 		{
@@ -13815,8 +13743,7 @@ ATPExecPartAdd(AlteredTableInfo *tab,
 						 errmsg("cannot add a DEFAULT partition%s "
 								"to %s of type HASH",
 								namBuf,
-								lrelname),
-										   errOmitLocation(true)));
+								lrelname)));
 
 			/* MPP-6093: ok to reset template */
 			if (pNode->default_part && !bSetTemplate)
@@ -13825,8 +13752,7 @@ ATPExecPartAdd(AlteredTableInfo *tab,
 						 errmsg("DEFAULT partition \"%s\" for "
 								"%s already exists",
 								pNode->default_part->parname,
-								lrelname),
-										   errOmitLocation(true)));
+								lrelname)));
 
 			/* XXX XXX: move this check to gram.y ? */
             if (pElem->boundSpec)
@@ -13966,8 +13892,7 @@ ATPExecPartAlter(List **wqueue, AlteredTableInfo *tab, Relation rel,
 			ereport(ERROR,
 					(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
 					 errmsg("cannot ALTER PARTITION for relation \"%s\"",
-							RelationGetRelationName(rel)),
-									   errOmitLocation(true)));
+							RelationGetRelationName(rel))));
 	}
 
 	if (Gp_role == GP_ROLE_DISPATCH)
@@ -13984,8 +13909,7 @@ ATPExecPartAlter(List **wqueue, AlteredTableInfo *tab, Relation rel,
 			ereport(ERROR,
 					(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
 					 errmsg("cannot ALTER PARTITION for relation \"%s\"",
-							RelationGetRelationName(rel)),
-									   errOmitLocation(true)));
+							RelationGetRelationName(rel))));
 		if (bPartitionCmd)
 		{
 			/* build the IDRule for the nested ALTER PARTITION cmd ... */
@@ -14034,8 +13958,7 @@ ATPExecPartAlter(List **wqueue, AlteredTableInfo *tab, Relation rel,
 										"DISTRIBUTED BY for %s",
 										prule->relname),
 										errhint("distribution policy of "
-												"partition must match parent"),
-														   errOmitLocation(true)
+												"partition must match parent")
 										));
 				}
 
@@ -14110,8 +14033,7 @@ ATPExecPartCoalesce(Relation rel,
     ereport(ERROR,
             (errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
              errmsg("cannot COALESCE PARTITION for relation \"%s\"",
-                    RelationGetRelationName(rel)),
-             			   errOmitLocation(true)));
+                    RelationGetRelationName(rel))));
 
 }
 
@@ -14168,13 +14090,11 @@ ATPExecPartDrop(Relation rel,
 				ereport(ERROR,
 						(errcode(ERRCODE_SYNTAX_ERROR),
 						 errmsg("missing name or value for DROP for %s",
-								lrelname),
-										   errOmitLocation(true)));
+								lrelname)));
 			else
 				ereport(ERROR,
 						(errcode(ERRCODE_SYNTAX_ERROR),
-						 errmsg("missing name or value for DROP"),
-								   errOmitLocation(true)));
+						 errmsg("missing name or value for DROP")));
 		}
 
 		/* if a range partition, and not specified, just get the first one */
@@ -14196,8 +14116,7 @@ ATPExecPartDrop(Relation rel,
 							prule->partIdStr,
 							prule->relname),
 					 errhint("FOR expression may only specify "
-							 "a non-default partition in this context."),
-									   errOmitLocation(true)));
+							 "a non-default partition in this context.")));
 
 	if (!prule)
 	{
@@ -14215,8 +14134,7 @@ ATPExecPartDrop(Relation rel,
 							"exist, skipping",
 							strVal(locPid->partiddef),
 							lrelname
-							),
-									   errOmitLocation(true)));
+							)));
 
 				break;
 			case AT_AP_IDValue:				/* IDentifier FOR Value */
@@ -14225,8 +14143,7 @@ ATPExecPartDrop(Relation rel,
 					 errmsg("partition for specified value of "
 							"%s does not exist, skipping",
 							lrelname
-							 ),
-									   errOmitLocation(true)));
+							 )));
 
 				break;
 			case AT_AP_IDRank:				/* IDentifier FOR Rank */
@@ -14235,8 +14152,7 @@ ATPExecPartDrop(Relation rel,
 					 errmsg("partition for specified rank of "
 							"%s does not exist, skipping",
 							lrelname
-							 ),
-									   errOmitLocation(true)));
+							 )));
 
 				break;
 			case AT_AP_ID_oid:				/* IDentifier by oid */
@@ -14245,8 +14161,7 @@ ATPExecPartDrop(Relation rel,
 					 errmsg("partition for specified oid of "
 							"%s does not exist, skipping",
 							lrelname
-							 ),
-									   errOmitLocation(true)));
+							 )));
 				break;
 			case AT_AP_IDDefault:			/* IDentify DEFAULT partition */
 				ereport(NOTICE,
@@ -14254,8 +14169,7 @@ ATPExecPartDrop(Relation rel,
 					 errmsg("DEFAULT partition for "
 							"%s does not exist, skipping",
 							lrelname
-							 ),
-									   errOmitLocation(true)));
+							 )));
 				break;
 			default: /* XXX XXX */
 				Assert(false);
@@ -14285,8 +14199,7 @@ ATPExecPartDrop(Relation rel,
 							prule->partIdStr,
 							prule->relname),
 					 errhint("recreate the table to reduce the "
-							 "number of partitions"),
-									   errOmitLocation(true)));
+							 "number of partitions")));
 
 		/* cannot drop last partition of table */
 		if (!bForceDrop && (numParts <= 1))
@@ -14300,8 +14213,7 @@ ATPExecPartDrop(Relation rel,
 								prule->relname),
 						 errhint("Use DROP TABLE \"%s\" to remove the "
 								 "table and the final partition ",
-								 RelationGetRelationName(rel)),
-										   errOmitLocation(true)));
+								 RelationGetRelationName(rel))));
 			else
 				ereport(ERROR,
 						(errcode(ERRCODE_DEPENDENT_OBJECTS_STILL_EXIST),
@@ -14310,8 +14222,7 @@ ATPExecPartDrop(Relation rel,
 								prule->partIdStr,
 								prule->relname),
 						 errhint("DROP the parent partition to remove the "
-								 "final partition "),
-										   errOmitLocation(true)));
+								 "final partition ")));
 
 		}
 		rel2 = heap_open(prule->topRule->parchildrelid, NoLock);
@@ -14440,6 +14351,7 @@ ATPExecPartExchange(AlteredTableInfo *tab, Relation rel, AlterPartitionCmd *pc)
 		RangeVar		   *oldrelrv;
 		PartitionNode 	   *pn;
 		Relation			oldrel;
+		Relation			newrel;
 
 		pn = RelationBuildPartitionDesc(rel, false);
 		pcols = get_partition_attrs(pn);
@@ -14456,8 +14368,7 @@ ATPExecPartExchange(AlteredTableInfo *tab, Relation rel, AlterPartitionCmd *pc)
 					 errmsg("cannot EXCHANGE PARTITION for "
 							"%s -- partition has children",
 							prule->relname
-							 ),
-									   errOmitLocation(true)));
+							 )));
 
 		orig_pid_type = pid->idtype;
 		orig_prule = prule;
@@ -14542,6 +14453,12 @@ ATPExecPartExchange(AlteredTableInfo *tab, Relation rel, AlterPartitionCmd *pc)
 		char			*oldNspName = NULL;
 
 		newrel = heap_open(newrelid, AccessExclusiveLock);
+		if (RelationIsExternal(newrel) && validate)
+		{
+			heap_close(newrel, NoLock);
+			elog(ERROR, "Validation of external tables not supported. Use WITHOUT VALIDATION.");
+		}
+
 		oldrel = heap_open(oldrelid, AccessExclusiveLock);
 
 		oldnspid = RelationGetNamespace(oldrel);
@@ -14642,8 +14559,7 @@ ATPExecPartExchange(AlteredTableInfo *tab, Relation rel, AlterPartitionCmd *pc)
 								"%s with relation \"%s\"",
 								orig_prule->partIdStr,
 								orig_prule->relname,
-								newname),
-						 errOmitLocation(true)));
+								newname)));
 		}
 	}
 	tab->exchange_relid = newrelid;
@@ -14725,8 +14641,7 @@ ATPExecPartMerge(Relation rel,
 						 errmsg("target of MERGE must be either \"%s\" or "
 								"\"%s\"",
 								get_rel_name(prule1->topRule->parchildrelid),
-								get_rel_name(prule2->topRule->parchildrelid)),
-										   errOmitLocation(true)));
+								get_rel_name(prule2->topRule->parchildrelid))));
 
 			}
 		}
@@ -14767,8 +14682,7 @@ ATPExecPartMerge(Relation rel,
     ereport(ERROR,
             (errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
              errmsg("cannot MERGE PARTITION for relation \"%s\"",
-                    RelationGetRelationName(rel)),
-             			   errOmitLocation(true)));
+                    RelationGetRelationName(rel))));
 
 }
 
@@ -14834,8 +14748,7 @@ ATPExecPartModify(Relation rel,
 							"for relation \"%s\"",
 							parTypName,
 							((prule && prule->isName) ? prule->partIdStr : ""),
-							RelationGetRelationName(rel)),
-									   errOmitLocation(true)));
+							RelationGetRelationName(rel))));
 
 		if ((bStart || bEnd) && ('r' != prule->pNode->part->parkind))
 			ereport(ERROR,
@@ -14845,8 +14758,7 @@ ATPExecPartModify(Relation rel,
 							"RANGE",
 							((prule && prule->isName) ? prule->partIdStr : ""),
 							parTypName
-							 ),
-									   errOmitLocation(true)));
+							 )));
 
 		if ((bAdd || bDrop) && ('l' != prule->pNode->part->parkind))
 			ereport(ERROR,
@@ -14856,8 +14768,7 @@ ATPExecPartModify(Relation rel,
 							"LIST",
 							((prule && prule->isName) ? prule->partIdStr : ""),
 							parTypName
-							 ),
-									   errOmitLocation(true)));
+							 )));
 
 		if (bAdd || bDrop)
 		{
@@ -14894,8 +14805,7 @@ ATPExecPartModify(Relation rel,
     ereport(ERROR,
             (errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
              errmsg("cannot MODIFY PARTITION for relation \"%s\"",
-                    RelationGetRelationName(rel)),
-             			   errOmitLocation(true)));
+                    RelationGetRelationName(rel))));
 
 }
 
@@ -15101,8 +15011,7 @@ ATPExecPartRename(Relation rel,
 			ereport(WARNING,
 					(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
 					 errmsg("renamed %d partitions, skipped %d child partitions due to name truncation",
-							renamed, skipped),
-									   errOmitLocation(true)));
+							renamed, skipped)));
 		}
 
 	}
@@ -15169,8 +15078,7 @@ ATPExecPartSetTemplate(AlteredTableInfo *tab,
 									"level %d "
 									"subpartition template specification",
 									RelationGetRelationName(rel),
-									lvl),
-											   errOmitLocation(true)));
+									lvl)));
 				}
 				break;
 			case 1:
@@ -15810,6 +15718,16 @@ ATPExecPartSplit(Relation rel,
 		/* Get target meta data */
 		prule = get_part_rule(rel, pid, true, true,
 							  CurrentMemoryContext, NULL, false);
+
+		/* Error out on external partition */
+		existrel = heap_open(prule->topRule->parchildrelid, NoLock);
+		if (RelationIsExternal(existrel))
+		{
+			heap_close(existrel, NoLock);
+			elog(ERROR, "Cannot split external partition");
+		}
+		heap_close(existrel, NoLock);
+
 		/*
 		 * In order to implement SPLIT, we do the following:
 		 *
@@ -16001,8 +15919,7 @@ ATPExecPartSplit(Relation rel,
 					ereport(ERROR,
 							(errcode(ERRCODE_DUPLICATE_OBJECT),
 							 errmsg("both INTO partitions "
-									"already exist"),
-							 errOmitLocation(true)));
+									"already exist")));
 
 				into_exists = 2;
 				intopid1 = (AlterPartitionId *)pc2->partid;
@@ -16904,16 +16821,14 @@ ATPExecPartTruncate(Relation rel,
 			ereport(NOTICE,
 					(errmsg("truncated partition%s for %s and its children",
 							prule->partIdStr,
-							prule->relname),
-									   errOmitLocation(true)));
+							prule->relname)));
 		}
 		else if ((pid->idtype != AT_AP_IDName)
 				 && prule->isName)
 				ereport(NOTICE,
 						(errmsg("truncated partition%s for %s",
 								prule->partIdStr,
-								prule->relname),
-										   errOmitLocation(true)));
+								prule->relname)));
 	}
 
 } /* end ATPExecPartTruncate */
@@ -16973,8 +16888,7 @@ AlterTableNamespace(RangeVar *relation, const char *newschema)
 				 errmsg("cannot move an owned sequence into another schema"),
 					 errdetail("Sequence \"%s\" is linked to table \"%s\".",
 							   RelationGetRelationName(rel),
-							   get_rel_name(tableId)),
-									   errOmitLocation(true)));
+							   get_rel_name(tableId))));
 	}
 
 	/* get schema OID and check its permissions */
@@ -16985,29 +16899,25 @@ AlterTableNamespace(RangeVar *relation, const char *newschema)
 				(errcode(ERRCODE_DUPLICATE_TABLE),
 				 errmsg("relation \"%s\" is already in schema \"%s\"",
 						RelationGetRelationName(rel),
-						newschema),
-								   errOmitLocation(true)));
+						newschema)));
 
 	/* disallow renaming into or out of temp schemas */
 	if (isAnyTempNamespace(nspOid) || isAnyTempNamespace(oldNspOid))
 		ereport(ERROR,
 				(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
-			errmsg("cannot move objects into or out of temporary schemas"),
-					   errOmitLocation(true)));
+			errmsg("cannot move objects into or out of temporary schemas")));
 
 	/* same for TOAST schema */
 	if (nspOid == PG_TOAST_NAMESPACE || oldNspOid == PG_TOAST_NAMESPACE)
 		ereport(ERROR,
 				(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
-				 errmsg("cannot move objects into or out of TOAST schema"),
-						   errOmitLocation(true)));
+				 errmsg("cannot move objects into or out of TOAST schema")));
 
 	/* same for AO SEGMENT schema */
 	if (nspOid == PG_AOSEGMENT_NAMESPACE || oldNspOid == PG_AOSEGMENT_NAMESPACE)
 		ereport(ERROR,
 				(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
-				 errmsg("cannot move objects into or out of AO SEGMENT schema"),
-						   errOmitLocation(true)));
+				 errmsg("cannot move objects into or out of AO SEGMENT schema")));
 
 
 	/* OK, modify the pg_class row and pg_depend entry */
@@ -17095,8 +17005,7 @@ AlterRelationNamespaceInternal(Relation classRel, Oid relOid,
 				(errcode(ERRCODE_DUPLICATE_TABLE),
 				 errmsg("relation \"%s\" already exists in schema \"%s\"",
 						NameStr(classForm->relname),
-						get_namespace_name(newNspOid)),
-								   errOmitLocation(true)));
+						get_namespace_name(newNspOid))));
 
 	/* classTup is a copy, so OK to scribble on */
 	classForm->relnamespace = newNspOid;
@@ -17461,8 +17370,7 @@ static Datum transformLocationUris(List *locs, List* fmtopts, bool isweb, bool i
 				ereport(ERROR,
 						(errcode(ERRCODE_INVALID_TABLE_DEFINITION),
 						 errmsg("location uri \"%s\" appears more than once",
-								uri1),
-										   errOmitLocation(true)));
+								uri1)));
 		}
 	}
 
@@ -17599,8 +17507,7 @@ static Datum transformLocationUris(List *locs, List* fmtopts, bool isweb, bool i
 					(errcode(ERRCODE_SYNTAX_ERROR),
 					errmsg("Unsupported use of a directory name in a writable gpfdist(s) external table : "
 							"\'%s\'", uri_str_final),
-					errhint("Specify the explicit path and file name to write into."),
-							   errOmitLocation(true)));
+					errhint("Specify the explicit path and file name to write into.")));
 
 		len = VARHDRSZ + strlen(uri_str_final);
 
@@ -17653,8 +17560,7 @@ static Datum transformExecOnClause(List	*on_clause, int *preferred_segment_num, 
 		if(exec_location_str)
 			ereport(ERROR,
 					(errcode(ERRCODE_SYNTAX_ERROR),
-					 errmsg("ON clause must not have more than one element."),
-							   errOmitLocation(true)));
+					 errmsg("ON clause must not have more than one element.")));
 
 		if (strcmp(defel->defname, "all") == 0)
 		{
@@ -17741,8 +17647,7 @@ static Datum transformExecOnClause(List	*on_clause, int *preferred_segment_num, 
 		{
 			ereport(ERROR,
 					(errcode(ERRCODE_GP_INTERNAL_ERROR),
-					 errmsg("Unknown location code for EXECUTE in tablecmds."),
-							   errOmitLocation(true)));
+					 errmsg("Unknown location code for EXECUTE in tablecmds.")));
 		}
 	}
 
@@ -17785,8 +17690,7 @@ static char transformFormatType(char *formatname)
 		ereport(ERROR,
 				(errcode(ERRCODE_SYNTAX_ERROR),
 				 errmsg("unsupported format '%s'", formatname),
-				 errhint("available formats are \"text\", \"csv\", or \"custom\""),
-						   errOmitLocation(true)));
+				 errhint("available formats are \"text\", \"csv\", or \"custom\"")));
 
 	return result;
 }
@@ -17832,8 +17736,7 @@ static Datum transformFormatOpts(char formattype, List *formatOpts, int numcols,
 				if (delim)
 					ereport(ERROR,
 							(errcode(ERRCODE_SYNTAX_ERROR),
-							 errmsg("conflicting or redundant options"),
-									   errOmitLocation(true)));
+							 errmsg("conflicting or redundant options")));
 				delim = strVal(defel->arg);
 			}
 			else if (strcmp(defel->defname, "null") == 0)
@@ -17841,8 +17744,7 @@ static Datum transformFormatOpts(char formattype, List *formatOpts, int numcols,
 				if (null_print)
 					ereport(ERROR,
 							(errcode(ERRCODE_SYNTAX_ERROR),
-							 errmsg("conflicting or redundant options"),
-									   errOmitLocation(true)));
+							 errmsg("conflicting or redundant options")));
 				null_print = strVal(defel->arg);
 			}
 			else if (strcmp(defel->defname, "header") == 0)
@@ -17850,8 +17752,7 @@ static Datum transformFormatOpts(char formattype, List *formatOpts, int numcols,
 				if (header_line)
 					ereport(ERROR,
 							(errcode(ERRCODE_SYNTAX_ERROR),
-							 errmsg("conflicting or redundant options"),
-									   errOmitLocation(true)));
+							 errmsg("conflicting or redundant options")));
 				header_line = intVal(defel->arg);
 			}
 			else if (strcmp(defel->defname, "quote") == 0)
@@ -17859,8 +17760,7 @@ static Datum transformFormatOpts(char formattype, List *formatOpts, int numcols,
 				if (quote)
 					ereport(ERROR,
 							(errcode(ERRCODE_SYNTAX_ERROR),
-							 errmsg("conflicting or redundant options"),
-									   errOmitLocation(true)));
+							 errmsg("conflicting or redundant options")));
 				quote = strVal(defel->arg);
 			}
 			else if (strcmp(defel->defname, "escape") == 0)
@@ -17868,8 +17768,7 @@ static Datum transformFormatOpts(char formattype, List *formatOpts, int numcols,
 				if (escape)
 					ereport(ERROR,
 							(errcode(ERRCODE_SYNTAX_ERROR),
-							 errmsg("conflicting or redundant options"),
-									   errOmitLocation(true)));
+							 errmsg("conflicting or redundant options")));
 				escape = strVal(defel->arg);
 			}
 			else if (strcmp(defel->defname, "force_notnull") == 0)
@@ -17877,8 +17776,7 @@ static Datum transformFormatOpts(char formattype, List *formatOpts, int numcols,
 				if (force_notnull)
 					ereport(ERROR,
 							(errcode(ERRCODE_SYNTAX_ERROR),
-							 errmsg("conflicting or redundant options"),
-									   errOmitLocation(true)));
+							 errmsg("conflicting or redundant options")));
 					
 				force_notnull = (List *) defel->arg;
 			}
@@ -17887,8 +17785,7 @@ static Datum transformFormatOpts(char formattype, List *formatOpts, int numcols,
 				if (force_quote)
 					ereport(ERROR,
 							(errcode(ERRCODE_SYNTAX_ERROR),
-							 errmsg("conflicting or redundant options"),
-									   errOmitLocation(true)));
+							 errmsg("conflicting or redundant options")));
 					
 				force_quote = (List *) defel->arg;
 			}
@@ -17897,8 +17794,7 @@ static Datum transformFormatOpts(char formattype, List *formatOpts, int numcols,
 				if (fill_missing)
 					ereport(ERROR,
 							(errcode(ERRCODE_SYNTAX_ERROR),
-							 errmsg("conflicting or redundant options"),
-									   errOmitLocation(true)));
+							 errmsg("conflicting or redundant options")));
 				fill_missing = intVal(defel->arg);
 			}
 			else if (strcmp(defel->defname, "newline") == 0)
@@ -17906,16 +17802,14 @@ static Datum transformFormatOpts(char formattype, List *formatOpts, int numcols,
 				if (eol_str)
 					ereport(ERROR,
 							(errcode(ERRCODE_SYNTAX_ERROR),
-							 errmsg("conflicting or redundant options"),
-									   errOmitLocation(true)));
+							 errmsg("conflicting or redundant options")));
 				eol_str = strVal(defel->arg);
 			}
 			else if (strcmp(defel->defname, "formatter") == 0)
 			{
 				ereport(ERROR,
 						(errcode(ERRCODE_SYNTAX_ERROR),
-						 errmsg("formatter option only valid for custom formatters"),
-						 errOmitLocation(true)));
+						 errmsg("formatter option only valid for custom formatters")));
 			}
 			else
 				elog(ERROR, "option \"%s\" not recognized",
@@ -18075,8 +17969,7 @@ static Datum transformFormatOpts(char formattype, List *formatOpts, int numcols,
 				if (formatter)
 					ereport(ERROR,
 							(errcode(ERRCODE_SYNTAX_ERROR),
-							 errmsg("conflicting or redundant options"),
-									   errOmitLocation(true)));
+							 errmsg("conflicting or redundant options")));
 					
 				formatter = strVal(defel->arg);
 			}
@@ -18100,15 +17993,13 @@ static Datum transformFormatOpts(char formattype, List *formatOpts, int numcols,
 			if (len > maxlen)
 				ereport(ERROR,
 						(errcode(ERRCODE_SYNTAX_ERROR),
-						 errmsg("format options must be less than %d bytes in size", maxlen),
-								   errOmitLocation(true)));			
+						 errmsg("format options must be less than %d bytes in size", maxlen)));			
 		}
 		
 		if(!formatter)
 			ereport(ERROR,
 					(errcode(ERRCODE_SYNTAX_ERROR),
-					 errmsg("no formatter function specified"),
-							   errOmitLocation(true)));
+					 errmsg("no formatter function specified")));
 	}
 	
 
@@ -18221,6 +18112,7 @@ char *alterTableCmdString(AlterTableType subtype)
 			
 		case AT_AddIndex: /* add index */
 		case AT_ReAddIndex: /* internal to commands/tablecmds.c */
+			cmdstring = pstrdup("add index or primary/unique key to");
 			break;
 			
 		case AT_AddConstraint: /* add constraint */
@@ -18274,6 +18166,7 @@ char *alterTableCmdString(AlterTableType subtype)
 			break;
 			
 		case AT_SetDistributedBy: /* SET DISTRIBUTED BY */
+			cmdstring = pstrdup("set distributed on");
 			break;
 			
 		case AT_PartAdd: /* Add */

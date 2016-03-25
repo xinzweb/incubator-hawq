@@ -1015,8 +1015,7 @@ restart:
 				ereport(ERROR,
 						(errcode(ERRCODE_DEPENDENT_OBJECTS_STILL_EXIST),
 						 errmsg("dependent privileges exist"),
-						 errhint("Use CASCADE to revoke them too."),
-						 errOmitLocation(true)));
+						 errhint("Use CASCADE to revoke them too.")));
 
 			mod_acl.ai_grantor = grantee;
 			mod_acl.ai_grantee = aip[i].ai_grantee;
@@ -2339,8 +2338,7 @@ convert_function_name(text *functionname)
 	if (!OidIsValid(oid))
 		ereport(ERROR,
 				(errcode(ERRCODE_UNDEFINED_FUNCTION),
-				 errmsg("function \"%s\" does not exist", funcname),
-				 errOmitLocation(true)));
+				 errmsg("function \"%s\" does not exist", funcname)));
 
 	return oid;
 }
@@ -2568,8 +2566,7 @@ convert_language_name(text *languagename)
 	if (!OidIsValid(oid))
 		ereport(ERROR,
 				(errcode(ERRCODE_UNDEFINED_OBJECT),
-				 errmsg("language \"%s\" does not exist", langname),
-				 errOmitLocation(true)));
+				 errmsg("language \"%s\" does not exist", langname)));
 
 	return oid;
 }
@@ -2790,8 +2787,7 @@ convert_schema_name(text *schemaname)
 	if (!OidIsValid(oid))
 		ereport(ERROR,
 				(errcode(ERRCODE_UNDEFINED_SCHEMA),
-				 errmsg("schema \"%s\" does not exist", nspname),
-				 errOmitLocation(true)));
+				 errmsg("schema \"%s\" does not exist", nspname)));
 
 	return oid;
 }
@@ -3727,8 +3723,7 @@ check_is_member_of_role(Oid member, Oid role)
 		ereport(ERROR,
 				(errcode(ERRCODE_INSUFFICIENT_PRIVILEGE),
 				 errmsg("must be member of role \"%s\"",
-						GetUserNameFromId(role)),
-				 errOmitLocation(true)));
+						GetUserNameFromId(role))));
 }
 
 /*

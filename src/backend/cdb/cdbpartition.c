@@ -37,6 +37,7 @@
 #include "catalog/dependency.h"
 #include "catalog/heap.h"
 #include "catalog/pg_constraint.h"
+#include "catalog/pg_exttable.h"
 #include "catalog/pg_inherits.h"
 #include "catalog/pg_type.h"
 #include "catalog/pg_operator.h"
@@ -215,6 +216,32 @@ get_partition_key_bitmapset(Oid relid);
 static List *get_deparsed_partition_encodings(Oid relid, Oid paroid);
 static List *rel_get_leaf_relids_from_rule(Oid ruleOid);
 
+/*
+ * Is the given relation the default partition of a partition table.
+ */
+bool
+rel_is_default_partition(Oid relid)
+{
+	HeapTuple tuple = NULL;
+	bool parisdefault = false;
+	/* Though pg_partition and pg_partition_rule are only populated
+	 * on the entry database, we accept calls from QEs running a
+	 * segment, but return false.
+	 */
+	if (Gp_segment != -1)
+		return false;
+
+	tuple = caql_getfirst(NULL,
+						  cql("SELECT * FROM pg_partition_rule "
+							   " WHERE parchildrelid = :1 ",
+							   ObjectIdGetDatum(relid)));
+
+	Insist(HeapTupleIsValid(tuple));
+
+	parisdefault = ((Form_pg_partition_rule)GETSTRUCT(tuple))->parisdefault;
+	return parisdefault;
+}
+
 /* Is the given relation the top relation of a partitioned table?
  *
  *   exists (select *
@@ -367,6 +394,79 @@ rel_partition_keys_ordered(Oid relid)
 	list_free(keysUnordered);
 
 	return pkeys;
+}
+ /*
+ * Dose relation have a external partition?
+ * Returns true only when the input is the root partition
+ * of a partitioned table and it has external partitions.
+ */
+bool
+rel_has_external_partition(Oid relid)
+{
+	ListCell *lc = NULL;
+	PartitionNode *n = get_parts(relid, 0 /*level*/ ,
+							0 /*parent*/, false /* inctemplate */, CurrentMemoryContext, false /*includesubparts*/);
+
+	if (n == NULL || n->rules == NULL)
+		return false;
+
+	foreach(lc, n->rules)
+	{
+		PartitionRule *rule = lfirst(lc);
+		Relation rel = heap_open(rule->parchildrelid, NoLock);
+
+		if (RelationIsExternal(rel))
+		{
+			heap_close(rel, NoLock);
+			return true;
+		}
+
+		heap_close(rel, NoLock);
+	}
+
+	return false;
+}
+
+/*
+ * check if a Query struct has external partion relation
+ */
+bool
+query_has_external_partition(Query *query)
+{
+	if (query == NULL)
+		return false;
+
+	ListCell *lc = NULL;
+	foreach(lc, query->rtable)
+	{
+		RangeTblEntry *rte = (RangeTblEntry *) lfirst(lc);
+		if (rte->rtekind == RTE_RELATION)
+		{
+			Assert(OidIsValid(rte->relid));
+			if (rel_has_external_partition(rte->relid))
+			{
+				return true;
+			}
+		}
+		else if (rte->rtekind == RTE_SUBQUERY)
+		{
+			Assert(rte->subquery != NULL);
+			if (query_has_external_partition(rte->subquery))
+			{
+				return true;
+			}
+		}
+	}
+
+	foreach(lc, query->cteList)
+	{
+		CommonTableExpr *cte = (CommonTableExpr *) lfirst(lc);
+		if (query_has_external_partition((Query *)cte->ctequery))
+		{
+			return true;
+		}
+	}
+	return false;
 }
 
 /*
@@ -704,8 +804,7 @@ cdb_exchange_part_constraints(Relation table,
 								"on \"%s\"",
 								RelationGetRelationName(part),
 								NameStr(con->conname),
-								RelationGetRelationName(table)),
-						 errOmitLocation(true)));
+								RelationGetRelationName(table))));
 			}
 			
 			/* The regular constraint should ultimately appear on the candidate
@@ -841,8 +940,7 @@ cdb_exchange_part_constraints(Relation table,
 				 errmsg("invalid constraint(s) found on \"%s\": %s",
 				 		RelationGetRelationName(cand),
 						constraint_names(excess_constraints)),
-				 errhint("drop the invalid constraints and retry"),
-				errOmitLocation(true)));
+				 errhint("drop the invalid constraints and retry")));
 	}
 	
 
@@ -4617,15 +4715,13 @@ get_part_rule1(Relation rel,
 						(errcode(ERRCODE_UNDEFINED_OBJECT),
 						 errmsg("partition%s of %s does not exist",
 								partIdStr,
-								relname),
-						 errOmitLocation(true)));
+								relname)));
 				break;
 			case AT_AP_IDDefault:			/* IDentify DEFAULT partition */
 				ereport(ERROR,
 						(errcode(ERRCODE_UNDEFINED_OBJECT),
 						 errmsg("DEFAULT partition of %s does not exist",
-								relname),
-						 errOmitLocation(true)));
+								relname)));
 				break;
 			default: /* XXX XXX */
 				Assert(false);
@@ -4648,8 +4744,7 @@ get_part_rule1(Relation rel,
 						(errcode(ERRCODE_DUPLICATE_OBJECT),
 						 errmsg("partition%s of %s already exists",
 								partIdStr,
-								relname),
-						 errOmitLocation(true)));
+								relname)));
 				break;
 			case AT_AP_IDDefault:			/* IDentify DEFAULT partition */
 				ereport(ERROR,
@@ -4657,8 +4752,7 @@ get_part_rule1(Relation rel,
 						 errmsg("DEFAULT partition%s of %s already exists",
 								prule->isName ?
 								partIdStr : "",
-								relname),
-						 errOmitLocation(true)));
+								relname)));
 				break;
 			default: /* XXX XXX */
 				Assert(false);
@@ -5334,8 +5428,7 @@ atpxPartAddList(Relation rel,
 						 */
 						ereport(ERROR,
 								(errcode(ERRCODE_INVALID_TABLE_DEFINITION),
-								 errmsg("invalid partition range specification."),
-								 errOmitLocation(true)));
+								 errmsg("invalid partition range specification.")));
 					}
 
 					PartitionRangeItem *ri =
@@ -7002,8 +7095,7 @@ atpxModifyListOverlap (Relation rel,
 										prule->partIdStr,
 										RelationGetRelationName(rel),
 										prule2->isName ?
-										prule2->partIdStr : ""),
-								 errOmitLocation(true)));
+										prule2->partIdStr : "")));
 					else
 						ereport(ERROR,
 								(errcode(ERRCODE_UNDEFINED_OBJECT),
@@ -7012,8 +7104,7 @@ atpxModifyListOverlap (Relation rel,
 										"ADD value has duplicate in "
 										"existing partition",
 										prule->partIdStr,
-										RelationGetRelationName(rel)),
-								 errOmitLocation(true)));
+										RelationGetRelationName(rel))));
 				}
 			}
 			else /* DROP values */
@@ -7029,8 +7120,7 @@ atpxModifyListOverlap (Relation rel,
 							 errmsg("cannot MODIFY LIST partition%s for "
 									"relation \"%s\" -- DROP value not found",
 									prule->partIdStr,
-									RelationGetRelationName(rel)),
-							 errOmitLocation(true)));
+									RelationGetRelationName(rel))));
 				}
 				
 				if (prule2 && (prule2->topRuleRank != prule->topRuleRank))
@@ -7043,8 +7133,7 @@ atpxModifyListOverlap (Relation rel,
 									prule->partIdStr,
 									RelationGetRelationName(rel),
 									prule2->isName ? "" : "other",
-									prule2->isName ? prule2->partIdStr : ""),
-							 errOmitLocation(true)));
+									prule2->isName ? prule2->partIdStr : "")));
 				}
 			}
 			
@@ -7868,8 +7957,7 @@ is_exchangeable(Relation rel, Relation oldrel, Relation newrel, bool throw)
 					 errmsg("owner of \"%s\" must be the same as that "
 							"of \"%s\"",
 							RelationGetRelationName(newrel),
-							RelationGetRelationName(rel)),
-					 errOmitLocation(true)));
+							RelationGetRelationName(rel))));
 	}
 	
 	/* Both part tables must have the same "WITH OID"s setting */
@@ -7881,8 +7969,7 @@ is_exchangeable(Relation rel, Relation oldrel, Relation newrel, bool throw)
 					(errcode(ERRCODE_SYNTAX_ERROR),
 					 errmsg("\"%s\" and \"%s\" must have same OIDs setting",
 							RelationGetRelationName(rel),
-							RelationGetRelationName(newrel)),
-					 errOmitLocation(true)));
+							RelationGetRelationName(newrel))));
 	}
 	
 	/* The new part table must not be involved in inheritance. */
@@ -7894,8 +7981,7 @@ is_exchangeable(Relation rel, Relation oldrel, Relation newrel, bool throw)
 					(errcode(ERRCODE_SYNTAX_ERROR),
 					 errmsg("cannot EXCHANGE table \"%s\" as it has "
 							"child table(s)",
-							RelationGetRelationName(newrel)),
-					 errOmitLocation(true)));
+							RelationGetRelationName(newrel))));
 	}
 	
 	if (congruent && relation_has_supers(RelationGetRelid(newrel)))
@@ -7906,8 +7992,7 @@ is_exchangeable(Relation rel, Relation oldrel, Relation newrel, bool throw)
 					(errcode(ERRCODE_SYNTAX_ERROR),
 					 errmsg("cannot exchange table \"%s\" as it "
 							"inherits other table(s)",
-							RelationGetRelationName(newrel)),
-					 errOmitLocation(true)));
+							RelationGetRelationName(newrel))));
 	}
 	
 	/* The new part table must not have rules on it. */
@@ -7918,8 +8003,7 @@ is_exchangeable(Relation rel, Relation oldrel, Relation newrel, bool throw)
 			ereport(ERROR,
 					(errcode(ERRCODE_SYNTAX_ERROR),
 					 errmsg("cannot exchange table which has rules "
-							"defined on it"),
-					 errOmitLocation(true)));
+							"defined on it")));
 	}
 	
 	/* The distribution policies of the existing part (oldpart) and the
@@ -7927,8 +8011,10 @@ is_exchangeable(Relation rel, Relation oldrel, Relation newrel, bool throw)
 	 * table.  However, we can only check this where the policy table is 
 	 * populated, i.e., on the entry database.  Note checking the policy
 	 * of the existing part is defensive.  It SHOULD match.
+	 * Skip the check when either the oldpart or the newpart is external. 
 	 */
-	if (congruent && Gp_role == GP_ROLE_DISPATCH)
+	if (congruent && Gp_role == GP_ROLE_DISPATCH &&
+	    !RelationIsExternal(newrel) && !RelationIsExternal(oldrel))
 	{
 		GpPolicy *parpol = rel->rd_cdbpolicy;
 		GpPolicy *oldpol = oldrel->rd_cdbpolicy;
@@ -7986,8 +8072,7 @@ is_exchangeable(Relation rel, Relation oldrel, Relation newrel, bool throw)
 						 errmsg("distribution policy for \"%s\" "
 								"must be the same as that for \"%s\"",
 								RelationGetRelationName(newrel),
-								RelationGetRelationName(rel)),
-						 errOmitLocation(true)));
+								RelationGetRelationName(rel))));
 		}
 		else if (false && memcmp(oldpol->attrs, newpol->attrs,
 								 sizeof(AttrNumber) * adjpol->nattrs))
@@ -7996,8 +8081,7 @@ is_exchangeable(Relation rel, Relation oldrel, Relation newrel, bool throw)
 			if ( throw )
 				ereport(ERROR,
 						(errcode(ERRCODE_SYNTAX_ERROR),
-						 errmsg("distribution policy matches but implementation lags"),
-						 errOmitLocation(true)));
+						 errmsg("distribution policy matches but implementation lags")));
 		}
 	}
 	
@@ -8179,8 +8263,7 @@ constraint_apply_mapped(HeapTuple tuple, AttrMap *map, Relation cand,
 						 errmsg("%s constraint \"%s\" missing", what, who),
 						 errhint("Add %s constraint \"%s\" to the candidate table"
 								 " or drop it from the partitioned table."
-								 , what, who),
-						 errOmitLocation(true)));
+								 , what, who)));
 			}
 			else 
 			{

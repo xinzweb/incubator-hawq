@@ -114,8 +114,7 @@ bit_in(PG_FUNCTION_ARGS)
 		ereport(ERROR,
 				(errcode(ERRCODE_STRING_DATA_LENGTH_MISMATCH),
 				 errmsg("bit string length %d does not match type bit(%d)",
-						bitlen, atttypmod),
-								 errOmitLocation(true)));
+						bitlen, atttypmod)));
 
 	len = VARBITTOTALLEN(atttypmod);
 	/* set to 0 so that *r is always initialised and string is zero-padded */
@@ -137,8 +136,7 @@ bit_in(PG_FUNCTION_ARGS)
 				ereport(ERROR,
 						(errcode(ERRCODE_INVALID_TEXT_REPRESENTATION),
 						 errmsg("\"%c\" is not a valid binary digit",
-								*sp),
-										 errOmitLocation(true)));
+								*sp)));
 
 			x >>= 1;
 			if (x == 0)
@@ -163,8 +161,7 @@ bit_in(PG_FUNCTION_ARGS)
 				ereport(ERROR,
 						(errcode(ERRCODE_INVALID_TEXT_REPRESENTATION),
 						 errmsg("\"%c\" is not a valid hexadecimal digit",
-								*sp),
-										 errOmitLocation(true)));
+								*sp)));
 
 			if (bc)
 			{
@@ -247,8 +244,7 @@ bit_recv(PG_FUNCTION_ARGS)
 	if (bitlen < 0)
 		ereport(ERROR,
 				(errcode(ERRCODE_INVALID_BINARY_REPRESENTATION),
-				 errmsg("invalid length in external bit string"),
-						 errOmitLocation(true)));
+				 errmsg("invalid length in external bit string")));
 
 	/*
 	 * Sometimes atttypmod is not supplied. If it is supplied we need to make
@@ -258,8 +254,7 @@ bit_recv(PG_FUNCTION_ARGS)
 		ereport(ERROR,
 				(errcode(ERRCODE_STRING_DATA_LENGTH_MISMATCH),
 				 errmsg("bit string length %d does not match type bit(%d)",
-						bitlen, atttypmod),
-								 errOmitLocation(true)));
+						bitlen, atttypmod)));
 
 	len = VARBITTOTALLEN(bitlen);
 	result = (VarBit *) palloc(len);
@@ -315,8 +310,7 @@ bit(PG_FUNCTION_ARGS)
 		ereport(ERROR,
 				(errcode(ERRCODE_STRING_DATA_LENGTH_MISMATCH),
 				 errmsg("bit string length %d does not match type bit(%d)",
-						VARBITLEN(arg), len),
-								 errOmitLocation(true)));
+						VARBITLEN(arg), len)));
 
 	rlen = VARBITTOTALLEN(len);
 	/* set to 0 so that string is zero-padded */
@@ -411,8 +405,7 @@ varbit_in(PG_FUNCTION_ARGS)
 		ereport(ERROR,
 				(errcode(ERRCODE_STRING_DATA_RIGHT_TRUNCATION),
 				 errmsg("bit string too long for type bit varying(%d)",
-						atttypmod),
-								 errOmitLocation(true)));
+						atttypmod)));
 
 	len = VARBITTOTALLEN(bitlen);
 	/* set to 0 so that *r is always initialised and string is zero-padded */
@@ -434,8 +427,7 @@ varbit_in(PG_FUNCTION_ARGS)
 				ereport(ERROR,
 						(errcode(ERRCODE_INVALID_TEXT_REPRESENTATION),
 						 errmsg("\"%c\" is not a valid binary digit",
-								*sp),
-										 errOmitLocation(true)));
+								*sp)));
 
 			x >>= 1;
 			if (x == 0)
@@ -460,8 +452,7 @@ varbit_in(PG_FUNCTION_ARGS)
 				ereport(ERROR,
 						(errcode(ERRCODE_INVALID_TEXT_REPRESENTATION),
 						 errmsg("\"%c\" is not a valid hexadecimal digit",
-								*sp),
-										 errOmitLocation(true)));
+								*sp)));
 
 			if (bc)
 			{
@@ -551,8 +542,7 @@ varbit_recv(PG_FUNCTION_ARGS)
 	if (bitlen < 0)
 		ereport(ERROR,
 				(errcode(ERRCODE_INVALID_BINARY_REPRESENTATION),
-				 errmsg("invalid length in external bit string"),
-						 errOmitLocation(true)));
+				 errmsg("invalid length in external bit string")));
 
 	/*
 	 * Sometimes atttypmod is not supplied. If it is supplied we need to make
@@ -562,8 +552,7 @@ varbit_recv(PG_FUNCTION_ARGS)
 		ereport(ERROR,
 				(errcode(ERRCODE_STRING_DATA_RIGHT_TRUNCATION),
 				 errmsg("bit string too long for type bit varying(%d)",
-						atttypmod),
-								 errOmitLocation(true)));
+						atttypmod)));
 
 	len = VARBITTOTALLEN(bitlen);
 	result = (VarBit *) palloc(len);
@@ -624,8 +613,7 @@ varbit(PG_FUNCTION_ARGS)
 		ereport(ERROR,
 				(errcode(ERRCODE_STRING_DATA_RIGHT_TRUNCATION),
 				 errmsg("bit string too long for type bit varying(%d)",
-						len),
-								 errOmitLocation(true)));
+						len)));
 
 	rlen = VARBITTOTALLEN(len);
 	result = (VarBit *) palloc(rlen);
@@ -1010,8 +998,7 @@ bitand(PG_FUNCTION_ARGS)
 	if (bitlen1 != bitlen2)
 		ereport(ERROR,
 				(errcode(ERRCODE_STRING_DATA_LENGTH_MISMATCH),
-				 errmsg("cannot AND bit strings of different sizes"),
-						 errOmitLocation(true)));
+				 errmsg("cannot AND bit strings of different sizes")));
 
 	len = VARSIZE(arg1);
 	result = (VarBit *) palloc(len);
@@ -1052,8 +1039,7 @@ bitor(PG_FUNCTION_ARGS)
 	if (bitlen1 != bitlen2)
 		ereport(ERROR,
 				(errcode(ERRCODE_STRING_DATA_LENGTH_MISMATCH),
-				 errmsg("cannot OR bit strings of different sizes"),
-						 errOmitLocation(true)));
+				 errmsg("cannot OR bit strings of different sizes")));
 	len = VARSIZE(arg1);
 	result = (VarBit *) palloc(len);
 	SET_VARSIZE(result, len);
@@ -1099,8 +1085,7 @@ bitxor(PG_FUNCTION_ARGS)
 	if (bitlen1 != bitlen2)
 		ereport(ERROR,
 				(errcode(ERRCODE_STRING_DATA_LENGTH_MISMATCH),
-				 errmsg("cannot XOR bit strings of different sizes"),
-						 errOmitLocation(true)));
+				 errmsg("cannot XOR bit strings of different sizes")));
 
 	len = VARSIZE(arg1);
 	result = (VarBit *) palloc(len);
@@ -1342,8 +1327,7 @@ bittoint4(PG_FUNCTION_ARGS)
 	if (VARBITLEN(arg) > sizeof(result) * BITS_PER_BYTE)
 		ereport(ERROR,
 				(errcode(ERRCODE_NUMERIC_VALUE_OUT_OF_RANGE),
-				 errmsg("integer out of range"),
-						 errOmitLocation(true)));
+				 errmsg("integer out of range")));
 
 	result = 0;
 	for (r = VARBITS(arg); r < VARBITEND(arg); r++)
@@ -1422,8 +1406,7 @@ bittoint8(PG_FUNCTION_ARGS)
 	if (VARBITLEN(arg) > sizeof(result) * BITS_PER_BYTE)
 		ereport(ERROR,
 				(errcode(ERRCODE_NUMERIC_VALUE_OUT_OF_RANGE),
-				 errmsg("bigint out of range"),
-						 errOmitLocation(true)));
+				 errmsg("bigint out of range")));
 
 	result = 0;
 	for (r = VARBITS(arg); r < VARBITEND(arg); r++)

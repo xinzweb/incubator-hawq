@@ -293,8 +293,7 @@ parseRelOptions(Datum options, int numkeywords, const char *const * keywords,
 				*p = '\0';
 			ereport(ERROR,
 					(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
-					 errmsg("unrecognized parameter \"%s\"", s),
-							   errOmitLocation(true)));
+					 errmsg("unrecognized parameter \"%s\"", s)));
 		}
 	}
 }
@@ -377,8 +376,7 @@ default_reloptions(Datum reloptions, bool validate, char relkind,
 			ereport(ERROR,
 					(errcode(ERRCODE_GP_FEATURE_NOT_SUPPORTED),
 					 errmsg("invalid option \"orientation\" for base relation. "
-							"Only valid for Append Only relations"),
-									   errOmitLocation(true)));
+							"Only valid for Append Only relations")));
 
 		if (!(pg_strcasecmp(values[8], "column") == 0 ||
 			  pg_strcasecmp(values[8], "row") == 0 ||

@@ -666,7 +666,6 @@ InitPostgres(const char *in_dbname, Oid dboid, const char *username,
 		ereport(FATAL,
 				(errcode(ERRCODE_TOO_MANY_CONNECTIONS),
 				 errmsg("connection limit exceeded for non-superusers"),
-				 errOmitLocation(true),
 				 errSendAlert(true)));
 
 	/*

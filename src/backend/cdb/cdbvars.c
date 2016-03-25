@@ -169,6 +169,8 @@ bool gp_interconnect_cache_future_packets=true;
 
 int			Gp_udp_bufsize_k; /* UPD recv buf size, in KB */
 
+int	Gp_segment = UNDEF_SEGMENT;
+
 #ifdef USE_ASSERT_CHECKING
 /*
  * UDP-IC Test hooks (for fault injection).

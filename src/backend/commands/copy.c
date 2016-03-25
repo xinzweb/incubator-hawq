@@ -826,14 +826,12 @@ void ValidateControlChars(bool copy, bool load, bool csv_mode, char *delim,
 	if (!csv_mode && quote != NULL)
 		ereport(ERROR,
 				(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
-				errmsg("quote available only in CSV mode"),
-				errOmitLocation(true)));
+				errmsg("quote available only in CSV mode")));
 
 	if (csv_mode && strlen(quote) != 1)
 		ereport(ERROR,
 				(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
-				errmsg("quote must be a single character"),
-				errOmitLocation(true)));
+				errmsg("quote must be a single character")));
 
 	if (csv_mode && strchr(null_print, quote[0]) != NULL)
 		ereport(ERROR,
@@ -851,8 +849,7 @@ void ValidateControlChars(bool copy, bool load, bool csv_mode, char *delim,
 	if (csv_mode && strlen(escape) != 1)
 		ereport(ERROR,
 				(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
-			errmsg("escape in CSV format must be a single character"),
-			errOmitLocation(true)));
+			errmsg("escape in CSV format must be a single character")));
 
 	if (!csv_mode &&
 		(strchr(escape, '\r') != NULL ||
@@ -1161,6 +1158,8 @@ DoCopy(const CopyStmt *stmt, const char *queryString)
 		cstate->errMode = ALL_OR_NOTHING; /* default */
 	}
 
+	cstate->skip_ext_partition = stmt->skip_ext_partition;
+
 	/* We must be a QE if we received the partitioning config */
 	if (stmt->partitions)
 	{
@@ -1238,8 +1237,7 @@ DoCopy(const CopyStmt *stmt, const char *queryString)
 				ereport(ERROR,
 						(errcode_for_file_access(),
 						 errmsg("could not open file \"%s\" for writing: %m",
-								cstate->filename),
-						 errOmitLocation(true)));
+								cstate->filename)));
 
 			// Increase buffer size to improve performance  (cmcdevitt)
 			setvbuf(cstate->copy_file, NULL, _IOFBF, 393216); // 384 Kbytes
@@ -1309,14 +1307,12 @@ DoCopy(const CopyStmt *stmt, const char *queryString)
 		if (cstate->oids)
 			ereport(ERROR,
 					(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
-					 errmsg("COPY (SELECT) WITH OIDS is not supported"),
-					 errOmitLocation(true)));
+					 errmsg("COPY (SELECT) WITH OIDS is not supported")));
 
 		if (query->intoClause)
 			ereport(ERROR,
 					(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
-					 errmsg("COPY (SELECT INTO) is not supported"),
-					 errOmitLocation(true)));
+					 errmsg("COPY (SELECT INTO) is not supported")));
 
 
 		/*
@@ -1520,8 +1516,7 @@ DoCopy(const CopyStmt *stmt, const char *queryString)
 				ereport(ERROR,
 						(errcode_for_file_access(),
 						 errmsg("could not open file \"%s\" for reading: %m",
-								cstate->filename),
-						 errOmitLocation(true)));
+								cstate->filename)));
 
 			// Increase buffer size to improve performance  (cmcdevitt)
             setvbuf(cstate->copy_file, NULL, _IOFBF, 393216); // 384 Kbytes
@@ -1840,20 +1835,17 @@ DoCopyTo(CopyState cstate)
 						(errcode(ERRCODE_WRONG_OBJECT_TYPE),
 						 errmsg("cannot copy from view \"%s\"",
 								RelationGetRelationName(cstate->rel)),
-						 errhint("Try the COPY (SELECT ...) TO variant."),
-						 errOmitLocation(true)));
+						 errhint("Try the COPY (SELECT ...) TO variant.")));
 			else if (relkind == RELKIND_SEQUENCE)
 				ereport(ERROR,
 						(errcode(ERRCODE_WRONG_OBJECT_TYPE),
 						 errmsg("cannot copy from sequence \"%s\"",
-								RelationGetRelationName(cstate->rel)),
-										 errOmitLocation(true)));
+								RelationGetRelationName(cstate->rel))));
 			else
 				ereport(ERROR,
 						(errcode(ERRCODE_WRONG_OBJECT_TYPE),
 						 errmsg("cannot copy from non-table relation \"%s\"",
-								RelationGetRelationName(cstate->rel)),
-										 errOmitLocation(true)));
+								RelationGetRelationName(cstate->rel))));
 		}
 		else if (RelationIsExternal(cstate->rel))
 		{
@@ -1861,8 +1853,24 @@ DoCopyTo(CopyState cstate)
 						(errcode(ERRCODE_WRONG_OBJECT_TYPE),
 						 errmsg("cannot copy from external relation \"%s\"",
 								RelationGetRelationName(cstate->rel)),
-						 errhint("Try the COPY (SELECT ...) TO variant."),
-								 errOmitLocation(true)));
+						 errhint("Try the COPY (SELECT ...) TO variant.")));
+		}
+		else if (rel_has_external_partition(cstate->rel->rd_id))
+		{
+			if (!cstate->skip_ext_partition)
+			{
+				ereport(ERROR,
+					(errcode(ERRCODE_WRONG_OBJECT_TYPE),
+					 errmsg("cannot copy from relation \"%s\" which has external partition(s)",
+							RelationGetRelationName(cstate->rel)),
+					 errhint("Try the COPY (SELECT ...) TO variant.")));
+			}
+			else
+			{
+				ereport(NOTICE,
+					(errcode(ERRCODE_WRONG_OBJECT_TYPE),
+					 errmsg("COPY ignores external partition(s)")));
+			}
 		}
 	}
 
@@ -2030,6 +2038,7 @@ CopyToDispatch(CopyState cstate)
 	cdbCopy = makeCdbCopy(false, cstate->resource);
 	
 	cdbCopy->partitions = RelationBuildPartitionDesc(cstate->rel, false);
+	cdbCopy->skip_ext_partition = cstate->skip_ext_partition;
 
 	/* XXX: lock all partitions */
 
@@ -3703,13 +3712,11 @@ CopyFromDispatch(CopyState cstate, List *err_segnos)
 	if (cdbCopy->remote_data_err)
 		ereport(ERROR,
 				(errcode(ERRCODE_BAD_COPY_FILE_FORMAT),
-				 errmsg("%s", cdbcopy_err.data),
-				 errOmitLocation(true)));
+				 errmsg("%s", cdbcopy_err.data)));
 	if (cdbCopy->io_errors)
 		ereport(ERROR,
 				(errcode(ERRCODE_IO_ERROR),
-				 errmsg("%s", cdbcopy_err.data),
-				 errOmitLocation(true)));
+				 errmsg("%s", cdbcopy_err.data)));
 
 	/*
 	 * switch back away from COPY error context callback. don't want line
@@ -5253,8 +5260,7 @@ CopyReadAttributesText(CopyState cstate, bool * __restrict nulls,
 			if (cur == NULL)
 				ereport(ERROR,
 						(errcode(ERRCODE_BAD_COPY_FILE_FORMAT),
-						 errmsg("extra data after last expected column"),
-						 errOmitLocation(true)));
+						 errmsg("extra data after last expected column")));
 
 			attnum = lfirst_int(cur);
 			m = attnum - 1;
@@ -5304,15 +5310,13 @@ CopyReadAttributesText(CopyState cstate, bool * __restrict nulls,
 					ereport(ERROR,
 							(errcode(ERRCODE_BAD_COPY_FILE_FORMAT),
 							 errmsg("missing data for column \"%s\"",
-									 NameStr(attr[lfirst_int(lnext(cur)) - 1]->attname)),
-							 errOmitLocation(true)));
+									 NameStr(attr[lfirst_int(lnext(cur)) - 1]->attname))));
 
 				else if (attribute == 1 && attr_pre_len == 0)
 					ereport(ERROR,
 							(errcode(ERRCODE_BAD_COPY_FILE_FORMAT),
 							 errmsg("missing data for column \"%s\", found empty data line",
-									 NameStr(attr[lfirst_int(lnext(cur)) - 1]->attname)),
-							 errOmitLocation(true)));
+									 NameStr(attr[lfirst_int(lnext(cur)) - 1]->attname))));
 			}
 		}
 		else
@@ -5321,8 +5325,7 @@ CopyReadAttributesText(CopyState cstate, bool * __restrict nulls,
 			if (cur == NULL)
 				ereport(ERROR,
 						(errcode(ERRCODE_BAD_COPY_FILE_FORMAT),
-						 errmsg("extra data after last expected column"),
-						 errOmitLocation(true)));
+						 errmsg("extra data after last expected column")));
 
 			if (*scan_end == delimc)	/* found a delimiter */
 			{
@@ -5641,8 +5644,7 @@ CopyReadAttributesCSV(CopyState cstate, bool *nulls, int *attr_offsets,
 				if(c != quotec)
 					ereport(ERROR,
 							(errcode(ERRCODE_BAD_COPY_FILE_FORMAT),
-							 errmsg("unterminated CSV quoted field"),
-							 errOmitLocation(true)));
+							 errmsg("unterminated CSV quoted field")));
 			}
 
 			/*
@@ -5685,8 +5687,7 @@ CopyReadAttributesCSV(CopyState cstate, bool *nulls, int *attr_offsets,
 			if (cur == NULL)
 				ereport(ERROR,
 						(errcode(ERRCODE_BAD_COPY_FILE_FORMAT),
-						 errmsg("extra data after last expected column"),
-						 errOmitLocation(true)));
+						 errmsg("extra data after last expected column")));
 
 			if(num_phys_attrs > 0)
 			{
@@ -5707,8 +5708,7 @@ CopyReadAttributesCSV(CopyState cstate, bool *nulls, int *attr_offsets,
 			if (cur == NULL)
 				ereport(ERROR,
 						(errcode(ERRCODE_BAD_COPY_FILE_FORMAT),
-						 errmsg("extra data after last expected column"),
-						 errOmitLocation(true)));
+						 errmsg("extra data after last expected column")));
 
 			saw_quote = false;
 
@@ -6194,14 +6194,12 @@ CopyGetAttnums(TupleDesc tupDesc, Relation rel, List *attnamelist)
 					ereport(ERROR,
 							(errcode(ERRCODE_UNDEFINED_COLUMN),
 							 errmsg("column \"%s\" of relation \"%s\" does not exist",
-									name, RelationGetRelationName(rel)),
-							 errOmitLocation(true)));
+									name, RelationGetRelationName(rel))));
 				else
 					ereport(ERROR,
 							(errcode(ERRCODE_UNDEFINED_COLUMN),
 							 errmsg("column \"%s\" does not exist",
-									name),
-							 errOmitLocation(true)));
+									name)));
 			}
 			/* Check for duplicates */
 			if (list_member_int(attnums, attnum))

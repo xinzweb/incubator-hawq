@@ -592,7 +592,6 @@ scanRTEForColumn(ParseState *pstate, RangeTblEntry *rte, char *colname,
 						(errcode(ERRCODE_AMBIGUOUS_COLUMN),
 						 errmsg("column reference \"%s\" is ambiguous",
 								colname),
-						 errOmitLocation(true),
 						 parser_errposition(pstate, location)));
 			result = (Node *) make_var(pstate, rte, attnum, location);
 			/* Require read access */
@@ -668,7 +667,6 @@ colNameToVar(ParseState *pstate, char *colname, bool localonly,
 							(errcode(ERRCODE_AMBIGUOUS_COLUMN),
 							 errmsg("column reference \"%s\" is ambiguous",
 									colname),
-							 errOmitLocation(true),
 							 parser_errposition(orig_pstate, location)));
 				result = newresult;
 			}
@@ -1264,16 +1262,14 @@ addRangeTableEntryForFunction(ParseState *pstate,
 		if (functypclass != TYPEFUNC_RECORD)
 			ereport(ERROR,
 					(errcode(ERRCODE_SYNTAX_ERROR),
-					 errmsg("a column definition list is only allowed for functions returning \"record\""),
-							   errOmitLocation(true)));
+					 errmsg("a column definition list is only allowed for functions returning \"record\"")));
 	}
 	else
 	{
 		if (functypclass == TYPEFUNC_RECORD)
 			ereport(ERROR,
 					(errcode(ERRCODE_SYNTAX_ERROR),
-					 errmsg("a column definition list is required for functions returning \"record\""),
-							   errOmitLocation(true)));
+					 errmsg("a column definition list is required for functions returning \"record\"")));
 	}
 
 	if (functypclass == TYPEFUNC_COMPOSITE)
@@ -1308,8 +1304,7 @@ addRangeTableEntryForFunction(ParseState *pstate,
 				ereport(ERROR,
 						(errcode(ERRCODE_INVALID_TABLE_DEFINITION),
 						 errmsg("column \"%s\" cannot be declared SETOF",
-								attrname),
-										   errOmitLocation(true)));
+								attrname)));
 			eref->colnames = lappend(eref->colnames, makeString(attrname));
 			attrtype = typenameTypeId(pstate, n->typname);
 			attrtypmod = n->typname->typmod;
@@ -1321,8 +1316,7 @@ addRangeTableEntryForFunction(ParseState *pstate,
 		ereport(ERROR,
 				(errcode(ERRCODE_DATATYPE_MISMATCH),
 			 errmsg("function \"%s\" in FROM has unsupported return type %s",
-					funcname, format_type_be(funcrettype)),
-							   errOmitLocation(true)));
+					funcname, format_type_be(funcrettype))));
 
 	/*----------
 	 * Flags:
@@ -1391,8 +1385,7 @@ addRangeTableEntryForValues(ParseState *pstate,
 		ereport(ERROR,
 				(errcode(ERRCODE_INVALID_COLUMN_REFERENCE),
 				 errmsg("VALUES lists \"%s\" have %d columns available but %d columns specified",
-						refname, numcolumns, numaliases),
-								   errOmitLocation(true)));
+						refname, numcolumns, numaliases)));
 
 	rte->eref = eref;
 
@@ -2287,8 +2280,7 @@ get_rte_attribute_type(RangeTblEntry *rte, AttrNumber attnum,
 							(errcode(ERRCODE_UNDEFINED_COLUMN),
 					errmsg("column \"%s\" of relation \"%s\" does not exist",
 						   NameStr(att_tup->attname),
-						   get_rel_name(rte->relid)),
-					errOmitLocation(true)));
+						   get_rel_name(rte->relid))));
 				*vartype = att_tup->atttypid;
 				*vartypmod = att_tup->atttypmod;
 
@@ -2672,7 +2664,6 @@ warnAutoRange(ParseState *pstate, RangeVar *relation, int location)
 					badAlias) :
 					  errhint("There is an entry for table \"%s\", but it cannot be referenced from this part of the query.",
 							  rte->eref->aliasname)),
-					  errOmitLocation(true),
 					 parser_errposition(pstate, location)));
 		else
 			ereport(ERROR,
@@ -2682,7 +2673,6 @@ warnAutoRange(ParseState *pstate, RangeVar *relation, int location)
 					relation->relname) :
 					  errmsg("missing FROM-clause entry for table \"%s\"",
 							 relation->relname)),
-					  errOmitLocation(true),
 					 parser_errposition(pstate, location)));
 	}
 	else
@@ -2701,7 +2691,6 @@ warnAutoRange(ParseState *pstate, RangeVar *relation, int location)
 				  (rte ?
 				   errhint("There is an entry for table \"%s\", but it cannot be referenced from this part of the query.",
 						   rte->eref->aliasname) : 0)),
-					errOmitLocation(true),
 				 parser_errposition(pstate, location)));
 	}
 }

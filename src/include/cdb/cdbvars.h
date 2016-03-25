@@ -513,6 +513,7 @@ extern bool gp_interconnect_log_stats;
 extern bool gp_interconnect_cache_future_packets;
 
 #define UNDEF_SEGMENT -2
+extern int Gp_segment;             /* GUC var */
 
 /*
  * Parameter interconnect_setup_timeout

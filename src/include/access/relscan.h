@@ -126,7 +126,10 @@ typedef struct FileScanDescData
 
 	/* custom data formatter */
 	FormatterData *fs_formatter;
-	
+
+	/* external partition */
+	bool		fs_hasConstraints;
+	List		**fs_constraintExprs;	
 }	FileScanDescData;
 
 typedef FileScanDescData *FileScanDesc;

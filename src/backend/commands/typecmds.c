@@ -199,8 +199,7 @@ DefineType(List *names, List *parameters, Oid newOid, Oid shadowOid)
 		if (parameters == NIL)
 			ereport(ERROR,
 					(errcode(ERRCODE_DUPLICATE_OBJECT),
-					 errmsg("type \"%s\" already exists", typeName),
-							   errOmitLocation(true)));
+					 errmsg("type \"%s\" already exists", typeName)));
 	}
 
 	foreach(pl, parameters)
@@ -236,8 +235,7 @@ DefineType(List *names, List *parameters, Oid newOid, Oid shadowOid)
 				ereport(ERROR,
 						(errcode(ERRCODE_DATATYPE_MISMATCH),
 						 errmsg("array element type cannot be %s",
-								format_type_be(elemType)),
-										   errOmitLocation(true)));
+								format_type_be(elemType))));
 		}
 		else if (pg_strcasecmp(defel->defname, "default") == 0)
 			defaultValue = defGetString(defel, &need_free_value);
@@ -268,8 +266,7 @@ DefineType(List *names, List *parameters, Oid newOid, Oid shadowOid)
 			else
 				ereport(ERROR,
 						(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
-						 errmsg("alignment \"%s\" not recognized", a),
-								   errOmitLocation(true)));
+						 errmsg("alignment \"%s\" not recognized", a)));
 		}
 		else if (pg_strcasecmp(defel->defname, "storage") == 0)
 		{
@@ -286,8 +283,7 @@ DefineType(List *names, List *parameters, Oid newOid, Oid shadowOid)
 			else
 				ereport(ERROR,
 						(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
-						 errmsg("storage \"%s\" not recognized", a),
-								   errOmitLocation(true)));
+						 errmsg("storage \"%s\" not recognized", a)));
 		}
 		else if (gp_upgrade_mode && pg_strcasecmp(defel->defname, "typtype") == 0)
 		{
@@ -315,8 +311,7 @@ DefineType(List *names, List *parameters, Oid newOid, Oid shadowOid)
 			ereport(WARNING,
 					(errcode(ERRCODE_SYNTAX_ERROR),
 					 errmsg("type attribute \"%s\" not recognized",
-							defel->defname),
-									   errOmitLocation(true)));
+							defel->defname)));
 	}
 
 	if (encoding)
@@ -331,13 +326,11 @@ DefineType(List *names, List *parameters, Oid newOid, Oid shadowOid)
 	if (inputName == NIL)
 		ereport(ERROR,
 				(errcode(ERRCODE_INVALID_OBJECT_DEFINITION),
-				 errmsg("type input function must be specified"),
-						   errOmitLocation(true)));
+				 errmsg("type input function must be specified")));
 	if (outputName == NIL)
 		ereport(ERROR,
 				(errcode(ERRCODE_INVALID_OBJECT_DEFINITION),
-				 errmsg("type output function must be specified"),
-						   errOmitLocation(true)));
+				 errmsg("type output function must be specified")));
 
 	/*
 	 * Convert I/O proc names to OIDs
@@ -361,16 +354,14 @@ DefineType(List *names, List *parameters, Oid newOid, Oid shadowOid)
 			/* backwards-compatibility hack */
 			ereport(WARNING,
 					(errmsg("changing return type of function %s from \"opaque\" to %s",
-							NameListToString(inputName), typeName),
-									   errOmitLocation(true)));
+							NameListToString(inputName), typeName)));
 			SetFunctionReturnType(inputOid, typoid);
 		}
 		else
 			ereport(ERROR,
 					(errcode(ERRCODE_INVALID_OBJECT_DEFINITION),
 					 errmsg("type input function %s must return type %s",
-							NameListToString(inputName), typeName),
-									   errOmitLocation(true)));
+							NameListToString(inputName), typeName)));
 	}
 	resulttype = get_func_rettype(outputOid);
 	if (resulttype != CSTRINGOID)
@@ -380,16 +371,14 @@ DefineType(List *names, List *parameters, Oid newOid, Oid shadowOid)
 			/* backwards-compatibility hack */
 			ereport(WARNING,
 					(errmsg("changing return type of function %s from \"opaque\" to \"cstring\"",
-							NameListToString(outputName)),
-									   errOmitLocation(true)));
+							NameListToString(outputName))));
 			SetFunctionReturnType(outputOid, CSTRINGOID);
 		}
 		else
 			ereport(ERROR,
 					(errcode(ERRCODE_INVALID_OBJECT_DEFINITION),
 			   errmsg("type output function %s must return type \"cstring\"",
-					  NameListToString(outputName)),
-							   errOmitLocation(true)));
+					  NameListToString(outputName))));
 	}
 	if (receiveOid)
 	{
@@ -398,8 +387,7 @@ DefineType(List *names, List *parameters, Oid newOid, Oid shadowOid)
 			ereport(ERROR,
 					(errcode(ERRCODE_INVALID_OBJECT_DEFINITION),
 					 errmsg("type receive function %s must return type %s",
-							NameListToString(receiveName), typeName),
-									   errOmitLocation(true)));
+							NameListToString(receiveName), typeName)));
 	}
 	if (sendOid)
 	{
@@ -408,8 +396,7 @@ DefineType(List *names, List *parameters, Oid newOid, Oid shadowOid)
 			ereport(ERROR,
 					(errcode(ERRCODE_INVALID_OBJECT_DEFINITION),
 				   errmsg("type send function %s must return type \"bytea\"",
-						  NameListToString(sendName)),
-								   errOmitLocation(true)));
+						  NameListToString(sendName))));
 	}
 
 	/*
@@ -542,8 +529,7 @@ RemoveType(List *names, DropBehavior behavior, bool missing_ok)
 			ereport(ERROR,
 					(errcode(ERRCODE_UNDEFINED_OBJECT),
 					 errmsg("type \"%s\" does not exist",
-							TypeNameToString(typname)),
-									   errOmitLocation(true)));
+							TypeNameToString(typname))));
 		}
 		else
 		{
@@ -551,8 +537,7 @@ RemoveType(List *names, DropBehavior behavior, bool missing_ok)
 			ereport(NOTICE,
 					(errcode(ERRCODE_UNDEFINED_OBJECT),
 					 errmsg("type \"%s\" does not exist, skipping",
-							TypeNameToString(typname)),
-									   errOmitLocation(true)));
+							TypeNameToString(typname))));
 		}
 
 		return;
@@ -704,8 +689,7 @@ DefineDomain(CreateDomainStmt *stmt)
 		ereport(ERROR,
 				(errcode(ERRCODE_DATATYPE_MISMATCH),
 				 errmsg("\"%s\" is not a valid base type for a domain",
-						TypeNameToString(stmt->typname)),
-								   errOmitLocation(true)));
+						TypeNameToString(stmt->typname))));
 
 	/* passed by value */
 	byValue = baseType->typbyval;
@@ -759,8 +743,7 @@ DefineDomain(CreateDomainStmt *stmt)
 		if (IsA(newConstraint, FkConstraint))
 			ereport(ERROR,
 					(errcode(ERRCODE_SYNTAX_ERROR),
-				errmsg("foreign key constraints not possible for domains"),
-						   errOmitLocation(true)));
+				errmsg("foreign key constraints not possible for domains")));
 
 		/* otherwise it should be a plain Constraint */
 		if (!IsA(newConstraint, Constraint))
@@ -780,8 +763,7 @@ DefineDomain(CreateDomainStmt *stmt)
 				if (saw_default)
 					ereport(ERROR,
 							(errcode(ERRCODE_SYNTAX_ERROR),
-							 errmsg("multiple default expressions"),
-									   errOmitLocation(true)));
+							 errmsg("multiple default expressions")));
 				saw_default = true;
 
 				if (constr->raw_expr)
@@ -827,8 +809,7 @@ DefineDomain(CreateDomainStmt *stmt)
 				if (nullDefined && !typNotNull)
 					ereport(ERROR,
 							(errcode(ERRCODE_SYNTAX_ERROR),
-						   errmsg("conflicting NULL/NOT NULL constraints"),
-								   errOmitLocation(true)));
+						   errmsg("conflicting NULL/NOT NULL constraints")));
 				typNotNull = true;
 				nullDefined = true;
 				break;
@@ -837,8 +818,7 @@ DefineDomain(CreateDomainStmt *stmt)
 				if (nullDefined && typNotNull)
 					ereport(ERROR,
 							(errcode(ERRCODE_SYNTAX_ERROR),
-						   errmsg("conflicting NULL/NOT NULL constraints"),
-								   errOmitLocation(true)));
+						   errmsg("conflicting NULL/NOT NULL constraints")));
 				typNotNull = false;
 				nullDefined = true;
 				break;
@@ -857,15 +837,13 @@ DefineDomain(CreateDomainStmt *stmt)
 			case CONSTR_UNIQUE:
 				ereport(ERROR,
 						(errcode(ERRCODE_SYNTAX_ERROR),
-					 errmsg("unique constraints not possible for domains"),
-							   errOmitLocation(true)));
+					 errmsg("unique constraints not possible for domains")));
 				break;
 
 			case CONSTR_PRIMARY:
 				ereport(ERROR,
 						(errcode(ERRCODE_SYNTAX_ERROR),
-				errmsg("primary key constraints not possible for domains"),
-						   errOmitLocation(true)));
+				errmsg("primary key constraints not possible for domains")));
 				break;
 
 			case CONSTR_ATTR_DEFERRABLE:
@@ -874,8 +852,7 @@ DefineDomain(CreateDomainStmt *stmt)
 			case CONSTR_ATTR_IMMEDIATE:
 				ereport(ERROR,
 						(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
-						 errmsg("specifying constraint deferrability not supported for domains"),
-								   errOmitLocation(true)));
+						 errmsg("specifying constraint deferrability not supported for domains")));
 				break;
 
 			default:
@@ -983,8 +960,7 @@ RemoveDomain(List *names, DropBehavior behavior, bool missing_ok)
 			ereport(ERROR,
 					(errcode(ERRCODE_UNDEFINED_OBJECT),
 					 errmsg("type \"%s\" does not exist",
-							TypeNameToString(typname)),
-									   errOmitLocation(true)));
+							TypeNameToString(typname))));
 		}
 		else
 		{
@@ -992,8 +968,7 @@ RemoveDomain(List *names, DropBehavior behavior, bool missing_ok)
 			ereport(NOTICE,
 					(errcode(ERRCODE_UNDEFINED_OBJECT),
 					 errmsg("type \"%s\" does not exist, skipping",
-							TypeNameToString(typname)),
-									   errOmitLocation(true)));
+							TypeNameToString(typname))));
 		}
 
 		return;
@@ -1024,8 +999,7 @@ RemoveDomain(List *names, DropBehavior behavior, bool missing_ok)
 		ereport(ERROR,
 				(errcode(ERRCODE_WRONG_OBJECT_TYPE),
 				 errmsg("\"%s\" is not a domain",
-						TypeNameToString(typname)),
-								   errOmitLocation(true)));
+						TypeNameToString(typname))));
 
 	caql_endscan(pcqCtx);
 
@@ -1091,8 +1065,7 @@ findTypeInputFunction(List *procname, Oid typeOid)
 		/* Found, but must complain and fix the pg_proc entry */
 		ereport(WARNING,
 				(errmsg("changing argument type of function %s from \"opaque\" to \"cstring\"",
-						NameListToString(procname)),
-								   errOmitLocation(true)));
+						NameListToString(procname))));
 		SetFunctionArgType(procOid, 0, CSTRINGOID);
 
 		/*
@@ -1110,8 +1083,7 @@ findTypeInputFunction(List *procname, Oid typeOid)
 	ereport(ERROR,
 			(errcode(ERRCODE_UNDEFINED_FUNCTION),
 			 errmsg("function %s does not exist",
-					func_signature_string(procname, 1, argList)),
-							   errOmitLocation(true)));
+					func_signature_string(procname, 1, argList))));
 
 	return InvalidOid;			/* keep compiler quiet */
 }
@@ -1144,8 +1116,7 @@ findTypeOutputFunction(List *procname, Oid typeOid)
 		/* Found, but must complain and fix the pg_proc entry */
 		ereport(WARNING,
 		(errmsg("changing argument type of function %s from \"opaque\" to %s",
-				NameListToString(procname), format_type_be(typeOid)),
-						   errOmitLocation(true)));
+				NameListToString(procname), format_type_be(typeOid))));
 		SetFunctionArgType(procOid, 0, typeOid);
 
 		/*
@@ -1163,8 +1134,7 @@ findTypeOutputFunction(List *procname, Oid typeOid)
 	ereport(ERROR,
 			(errcode(ERRCODE_UNDEFINED_FUNCTION),
 			 errmsg("function %s does not exist",
-					func_signature_string(procname, 1, argList)),
-							   errOmitLocation(true)));
+					func_signature_string(procname, 1, argList))));
 
 	return InvalidOid;			/* keep compiler quiet */
 }
@@ -1195,8 +1165,7 @@ findTypeReceiveFunction(List *procname, Oid typeOid)
 	ereport(ERROR,
 			(errcode(ERRCODE_UNDEFINED_FUNCTION),
 			 errmsg("function %s does not exist",
-					func_signature_string(procname, 1, argList)),
-							   errOmitLocation(true)));
+					func_signature_string(procname, 1, argList))));
 
 	return InvalidOid;			/* keep compiler quiet */
 }
@@ -1219,8 +1188,7 @@ findTypeSendFunction(List *procname, Oid typeOid)
 	ereport(ERROR,
 			(errcode(ERRCODE_UNDEFINED_FUNCTION),
 			 errmsg("function %s does not exist",
-					func_signature_string(procname, 1, argList)),
-							   errOmitLocation(true)));
+					func_signature_string(procname, 1, argList))));
 
 	return InvalidOid;			/* keep compiler quiet */
 }
@@ -1241,15 +1209,13 @@ findTypeAnalyzeFunction(List *procname, Oid typeOid)
 		ereport(ERROR,
 				(errcode(ERRCODE_UNDEFINED_FUNCTION),
 				 errmsg("function %s does not exist",
-						func_signature_string(procname, 1, argList)),
-								   errOmitLocation(true)));
+						func_signature_string(procname, 1, argList))));
 
 	if (get_func_rettype(procOid) != BOOLOID)
 		ereport(ERROR,
 				(errcode(ERRCODE_INVALID_OBJECT_DEFINITION),
 			  errmsg("type analyze function %s must return type \"boolean\"",
-					 NameListToString(procname)),
-							   errOmitLocation(true)));
+					 NameListToString(procname))));
 
 	return procOid;
 }
@@ -1287,8 +1253,7 @@ DefineCompositeType(const RangeVar *typevar, List *coldeflist, Oid relOid, Oid c
 	if (coldeflist == NIL)
 		ereport(ERROR,
 				(errcode(ERRCODE_INVALID_OBJECT_DEFINITION),
-				 errmsg("composite type must have at least one attribute"),
-						   errOmitLocation(true)));
+				 errmsg("composite type must have at least one attribute")));
 
 	/*
 	 * now set the parameters for keys/inheritance etc. All of these are
@@ -1674,8 +1639,7 @@ AlterDomainAddConstraint(List *names, Node *newConstraint)
 	if (IsA(newConstraint, FkConstraint))
 		ereport(ERROR,
 				(errcode(ERRCODE_SYNTAX_ERROR),
-				 errmsg("foreign key constraints not possible for domains"),
-						   errOmitLocation(true)));
+				 errmsg("foreign key constraints not possible for domains")));
 
 	/* otherwise it should be a plain Constraint */
 	if (!IsA(newConstraint, Constraint))
@@ -1693,15 +1657,13 @@ AlterDomainAddConstraint(List *names, Node *newConstraint)
 		case CONSTR_UNIQUE:
 			ereport(ERROR,
 					(errcode(ERRCODE_SYNTAX_ERROR),
-					 errmsg("unique constraints not possible for domains"),
-							   errOmitLocation(true)));
+					 errmsg("unique constraints not possible for domains")));
 			break;
 
 		case CONSTR_PRIMARY:
 			ereport(ERROR,
 					(errcode(ERRCODE_SYNTAX_ERROR),
-				errmsg("primary key constraints not possible for domains"),
-						   errOmitLocation(true)));
+				errmsg("primary key constraints not possible for domains")));
 			break;
 
 		case CONSTR_ATTR_DEFERRABLE:
@@ -1710,8 +1672,7 @@ AlterDomainAddConstraint(List *names, Node *newConstraint)
 		case CONSTR_ATTR_IMMEDIATE:
 			ereport(ERROR,
 					(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
-					 errmsg("specifying constraint deferrability not supported for domains"),
-							   errOmitLocation(true)));
+					 errmsg("specifying constraint deferrability not supported for domains")));
 			break;
 
 		default:
@@ -1784,8 +1745,7 @@ AlterDomainAddConstraint(List *names, Node *newConstraint)
 							(errcode(ERRCODE_CHECK_VIOLATION),
 							 errmsg("column \"%s\" of table \"%s\" contains values that violate the new constraint",
 								NameStr(tupdesc->attrs[attnum - 1]->attname),
-									RelationGetRelationName(testrel)),
-											   errOmitLocation(true)));
+									RelationGetRelationName(testrel))));
 			}
 
 			ResetExprContext(econtext);
@@ -1978,8 +1938,7 @@ checkDomainOwner(HeapTuple tup, TypeName *typname)
 		ereport(ERROR,
 				(errcode(ERRCODE_WRONG_OBJECT_TYPE),
 				 errmsg("\"%s\" is not a domain",
-						TypeNameToString(typname)),
-								   errOmitLocation(true)));
+						TypeNameToString(typname))));
 
 	/* Permission check: must own type */
 	if (!pg_type_ownercheck(HeapTupleGetOid(tup), GetUserId()))
@@ -2013,8 +1972,7 @@ domainAddConstraint(Oid domainOid, Oid domainNamespace, Oid baseTypeOid,
 			ereport(ERROR,
 					(errcode(ERRCODE_DUPLICATE_OBJECT),
 				 errmsg("constraint \"%s\" for domain \"%s\" already exists",
-						constr->name, domainName),
-								   errOmitLocation(true)));
+						constr->name, domainName)));
 	}
 	else
 		constr->name = ChooseConstraintName(domainName,
@@ -2054,8 +2012,7 @@ domainAddConstraint(Oid domainOid, Oid domainNamespace, Oid baseTypeOid,
 	if (list_length(pstate->p_rtable) != 0)
 		ereport(ERROR,
 				(errcode(ERRCODE_INVALID_COLUMN_REFERENCE),
-		  errmsg("cannot use table references in domain check constraint"),
-				   errOmitLocation(true)));
+		  errmsg("cannot use table references in domain check constraint")));
 
 	/*
 	 * Domains don't allow var clauses (this should be redundant with the
@@ -2064,8 +2021,7 @@ domainAddConstraint(Oid domainOid, Oid domainNamespace, Oid baseTypeOid,
 	if (contain_var_clause(expr))
 		ereport(ERROR,
 				(errcode(ERRCODE_INVALID_COLUMN_REFERENCE),
-		  errmsg("cannot use table references in domain check constraint"),
-				   errOmitLocation(true)));
+		  errmsg("cannot use table references in domain check constraint")));
 
 	/*
 	 * No subplans or aggregates, either...
@@ -2073,18 +2029,15 @@ domainAddConstraint(Oid domainOid, Oid domainNamespace, Oid baseTypeOid,
 	if (pstate->p_hasSubLinks)
 		ereport(ERROR,
 				(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
-				 errmsg("cannot use subquery in check constraint"),
-						   errOmitLocation(true)));
+				 errmsg("cannot use subquery in check constraint")));
 	if (pstate->p_hasAggs)
 		ereport(ERROR,
 				(errcode(ERRCODE_GROUPING_ERROR),
-			   errmsg("cannot use aggregate function in check constraint"),
-					   errOmitLocation(true)));
+			   errmsg("cannot use aggregate function in check constraint")));
 	if (pstate->p_hasWindFuncs)
 		ereport(ERROR,
 				(errcode(ERRCODE_SYNTAX_ERROR),
-			   errmsg("cannot use window function in check constraint"),
-					   errOmitLocation(true)));
+			   errmsg("cannot use window function in check constraint")));
 
 	free_parsestate(&pstate);
 
@@ -2288,8 +2241,7 @@ AlterTypeOwner(List *names, Oid newOwnerId)
 		ereport(ERROR,
 				(errcode(ERRCODE_UNDEFINED_OBJECT),
 				 errmsg("type \"%s\" does not exist",
-						TypeNameToString(typname)),
-								   errOmitLocation(true)));
+						TypeNameToString(typname))));
 
 	/* Look up the type in the type table */
 	rel = heap_open(TypeRelationId, RowExclusiveLock);
@@ -2317,8 +2269,7 @@ AlterTypeOwner(List *names, Oid newOwnerId)
 		ereport(ERROR,
 				(errcode(ERRCODE_WRONG_OBJECT_TYPE),
 				 errmsg("\"%s\" is a table's row type",
-						TypeNameToString(typname)),
-								   errOmitLocation(true)));
+						TypeNameToString(typname))));
 
 	/*
 	 * If the new owner is the same as the existing owner, consider the
@@ -2493,29 +2444,25 @@ AlterTypeNamespaceInternal(Oid typeOid, Oid nspOid,
 				(errcode(ERRCODE_DUPLICATE_OBJECT),
 				 errmsg("type %s is already in schema \"%s\"",
 						format_type_be(typeOid),
-						get_namespace_name(nspOid)),
-								   errOmitLocation(true)));
+						get_namespace_name(nspOid))));
 
 	/* disallow renaming into or out of temp schemas */
 	if (isAnyTempNamespace(nspOid) || isAnyTempNamespace(oldNspOid))
 		ereport(ERROR,
 				(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
-			errmsg("cannot move objects into or out of temporary schemas"),
-					   errOmitLocation(true)));
+			errmsg("cannot move objects into or out of temporary schemas")));
 
 	/* same for TOAST schema */
 	if (nspOid == PG_TOAST_NAMESPACE || oldNspOid == PG_TOAST_NAMESPACE)
 		ereport(ERROR,
 				(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
-				 errmsg("cannot move objects into or out of TOAST schema"),
-						   errOmitLocation(true)));
+				 errmsg("cannot move objects into or out of TOAST schema")));
 
 	/* same for AO SEGMENT schema */
 	if (nspOid == PG_AOSEGMENT_NAMESPACE || oldNspOid == PG_AOSEGMENT_NAMESPACE)
 		ereport(ERROR,
 				(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
-				 errmsg("cannot move objects into or out of AO SEGMENT schema"),
-						   errOmitLocation(true)));
+				 errmsg("cannot move objects into or out of AO SEGMENT schema")));
 
 	/* check for duplicate name (more friendly than unique-index failure) */
 	if (caql_getcount(
@@ -2530,8 +2477,7 @@ AlterTypeNamespaceInternal(Oid typeOid, Oid nspOid,
 				(errcode(ERRCODE_DUPLICATE_OBJECT),
 				 errmsg("type \"%s\" already exists in schema \"%s\"",
 						NameStr(typform->typname),
-						get_namespace_name(nspOid)),
-								   errOmitLocation(true)));
+						get_namespace_name(nspOid))));
 	}
 
 	/* Detect whether type is a composite type (but not a table rowtype) */

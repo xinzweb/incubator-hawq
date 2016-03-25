@@ -1459,15 +1459,13 @@ exec_mpp_query(const char *query_string,
 		case 1:
 			ereport(LOG,
 					(errmsg("duration: %s ms", msec_str),
-					 errOmitLocation(true),
 					 errhidestmt(true)));
 			break;
 		case 2:
 			ereport(LOG,
 					(errmsg("duration: %s ms  statement: %s",
 							msec_str, query_string),
-					 errhidestmt(true),
-					 errOmitLocation(true)));
+					 errhidestmt(true)));
 			break;
 	}
 
@@ -1565,7 +1563,6 @@ exec_simple_query(const char *query_string, const char *seqServerHost, int seqSe
 			ereport(LOG,
 				(errmsg("statement: %s", query_string),
 				 errhidestmt(true),
-				 errOmitLocation(true),
 				 errdetail_execute(parsetree_list)));
 			was_logged = true;
 		}
@@ -1637,8 +1634,7 @@ exec_simple_query(const char *query_string, const char *seqServerHost, int seqSe
 			ereport(ERROR,
 					(errcode(ERRCODE_IN_FAILED_SQL_TRANSACTION),
 					 errmsg("current transaction is aborted, "
-						"commands ignored until end of transaction block"),
-					 errOmitLocation(true)));
+						"commands ignored until end of transaction block")));
 
 		/* Make sure we are in a transaction command */
 		start_xact_command();
@@ -1824,14 +1820,12 @@ exec_simple_query(const char *query_string, const char *seqServerHost, int seqSe
 			case 1:
 				ereport(LOG,
 					(errmsg("duration: %s ms", msec_str),
-					 errOmitLocation(true),
 					 errhidestmt(true)));
 				break;
 			case 2:
 				ereport(LOG, (errmsg("duration: %s ms  statement: %s",
 									 msec_str, query_string),
 							  errdetail_execute(parsetree_list),
-							  errOmitLocation(true),
 							  errhidestmt(true)));
 				break;
 		}
@@ -2107,7 +2101,6 @@ exec_parse_message(const char *query_string,	/* string to execute */
 		case 1:
 			ereport(LOG,
 					(errmsg("duration: %s ms", msec_str),
-					 errOmitLocation(true),
 					 errhidestmt(true)));
 			break;
 		case 2:
@@ -2116,7 +2109,6 @@ exec_parse_message(const char *query_string,	/* string to execute */
 							msec_str,
 							*stmt_name ? stmt_name : "<unnamed>",
 							query_string),
-							errOmitLocation(true),
 							errhidestmt(true)));
 			break;
 	}
@@ -2488,7 +2480,6 @@ exec_bind_message(StringInfo input_message)
 		case 1:
 			ereport(LOG,
 					(errmsg("duration: %s ms", msec_str),
-					 errOmitLocation(true),
 					 errhidestmt(true)));
 			break;
 		case 2:
@@ -2500,7 +2491,6 @@ exec_bind_message(StringInfo input_message)
 							*portal_name ? portal_name : "",
 							pstmt->query_string ? pstmt->query_string : "<source not stored>"),
 					 errdetail_params(params),
-					 errOmitLocation(true),
 					 errhidestmt(true)));
 			break;
 	}
@@ -2675,7 +2665,6 @@ exec_execute_message(const char *portal_name, int64 max_rows)
 						sourceText ? ": " : "",
 						sourceText ? sourceText : ""),
 				 errdetail_params(portalParams),
-				 errOmitLocation(true),
 				 errhidestmt(true)));
 		was_logged = true;
 	}
@@ -2746,7 +2735,6 @@ exec_execute_message(const char *portal_name, int64 max_rows)
 		case 1:
 			ereport(LOG,
 					(errmsg("duration: %s ms", msec_str),
-					 errOmitLocation(true),
 					 errhidestmt(true)));
 			break;
 		case 2:
@@ -2762,7 +2750,6 @@ exec_execute_message(const char *portal_name, int64 max_rows)
 							sourceText ? ": " : "",
 							sourceText ? sourceText : ""),
 					 errdetail_params(portalParams),
-					 errOmitLocation(true),
 					 errhidestmt(true)));
 			break;
 	}
@@ -5407,8 +5394,7 @@ ShowUsage(const char *title)
 
 	ereport(LOG,
 			(errmsg_internal("%s", title),
-			 errdetail("%s", str.data),
-			 errOmitLocation(true)));
+			 errdetail("%s", str.data)));
 
 	pfree(str.data);
 }
@@ -5442,8 +5428,7 @@ log_disconnections(int code, Datum arg __attribute__((unused)))
 					"user=%s database=%s host=%s%s%s",
 					hours, minutes, seconds, msecs,
 					port->user_name, port->database_name, port->remote_host,
-					port->remote_port[0] ? " port=" : "", port->remote_port),
-					errOmitLocation(true)));
+					port->remote_port[0] ? " port=" : "", port->remote_port)));
 }
 
 void OnMoveOutCGroupForQE(void)

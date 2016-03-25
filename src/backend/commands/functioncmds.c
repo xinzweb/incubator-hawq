@@ -669,8 +669,7 @@ interpret_AS_clause(Oid languageOid, const char *languageName, List *as,
 			ereport(ERROR,
 					(errcode(ERRCODE_INVALID_FUNCTION_DEFINITION),
 					 errmsg("only one AS item needed for language \"%s\"",
-							languageName),
-					 errOmitLocation(true)));
+							languageName)));
 	}
 }
 
@@ -706,8 +705,7 @@ validate_describe_callback(List *describeQualName,
 	{
 		ereport(ERROR,
 				(errcode(ERRCODE_INVALID_FUNCTION_DEFINITION),
-				 errmsg("DESCRIBE only supported for functions returning \"record\""),
-				 errOmitLocation(true)));
+				 errmsg("DESCRIBE only supported for functions returning \"record\"")));
 	}
 	if (parameterModes)
 	{
@@ -766,24 +764,21 @@ validate_describe_callback(List *describeQualName,
 		ereport(ERROR,
 				(errcode(ERRCODE_UNDEFINED_FUNCTION),
 				 errmsg("function %s does not exist",
-						func_signature_string(describeQualName, nargs, inputTypeOids)),
-				 errOmitLocation(true)));
+						func_signature_string(describeQualName, nargs, inputTypeOids))));
 	}
 	if (describeReturnTypeOid != INTERNALOID)
 	{
 		ereport(ERROR,
 				(errcode(ERRCODE_INVALID_FUNCTION_DEFINITION),
 				 errmsg("return type of function %s is not \"internal\"",
-						func_signature_string(describeQualName, nargs, inputTypeOids)),
-				 errOmitLocation(true)));
+						func_signature_string(describeQualName, nargs, inputTypeOids))));
 	}
 	if (describeReturnsSet)
 	{
 		ereport(ERROR,
 				(errcode(ERRCODE_INVALID_FUNCTION_DEFINITION),
 				 errmsg("function %s returns a set",
-						func_signature_string(describeQualName, nargs, inputTypeOids)),
-				 errOmitLocation(true)));
+						func_signature_string(describeQualName, nargs, inputTypeOids))));
 	}
 
 	/* Check that the creator has permission to call the function */
@@ -905,8 +900,7 @@ CreateFunction(CreateFunctionStmt *stmt)
 			ereport(ERROR,
 					(errcode(ERRCODE_INVALID_FUNCTION_DEFINITION),
 					 errmsg("function result type must be %s because of OUT parameters",
-							format_type_be(requiredResultType)),
-					 errOmitLocation(true)));
+							format_type_be(requiredResultType))));
 		stmt->shelltypeOid = prorettype;
 	}
 	else if (OidIsValid(requiredResultType))

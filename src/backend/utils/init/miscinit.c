@@ -447,8 +447,7 @@ InitializeSessionUserId(const char *rolename)
 	if (!HeapTupleIsValid(roleTup))
 		ereport(FATAL,
 				(errcode(ERRCODE_INVALID_AUTHORIZATION_SPECIFICATION),
-				 errmsg("role \"%s\" does not exist", rolename),
-				 errOmitLocation(true), errSendAlert(false)));
+				 errmsg("role \"%s\" does not exist", rolename), errSendAlert(false)));
 
 	rform = (Form_pg_authid) GETSTRUCT(roleTup);
 	roleid = HeapTupleGetOid(roleTup);
@@ -479,8 +478,7 @@ InitializeSessionUserId(const char *rolename)
 			ereport(FATAL,
 					(errcode(ERRCODE_INVALID_AUTHORIZATION_SPECIFICATION),
 					 errmsg("role \"%s\" is not permitted to log in",
-							rolename),
-					 errOmitLocation(true)));
+							rolename)));
 
 		/*
 		 * In Upgrade Mode, normal connection (i.e. dispatch mode)
@@ -531,8 +529,7 @@ InitializeSessionUserId(const char *rolename)
 			ereport(FATAL,
 					(errcode(ERRCODE_TOO_MANY_CONNECTIONS),
 					 errmsg("too many connections for role \"%s\"",
-							rolename),
-					 errOmitLocation(true)));
+							rolename)));
 	}
 
 	/* Record username and superuser status as GUC settings too */
@@ -601,8 +598,7 @@ SetSessionAuthorization(Oid userid, bool is_superuser)
 		!AuthenticatedUserIsSuperuser)
 		ereport(ERROR,
 				(errcode(ERRCODE_INSUFFICIENT_PRIVILEGE),
-				 errmsg("permission denied to set session authorization"),
-				 errOmitLocation(true)));
+				 errmsg("permission denied to set session authorization")));
 
 	SetSessionUserId(userid, is_superuser);
 

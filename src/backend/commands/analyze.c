@@ -1496,6 +1496,7 @@ static Oid buildSampleTable(Oid relationOid,
 {
 	int nAttributes = -1;
 	StringInfoData str;
+	StringInfoData columnStr;
 	int i = 0;
 	ListCell *le = NULL;
 	const char *schemaName = NULL;

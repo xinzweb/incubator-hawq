@@ -4721,8 +4721,7 @@ get_part(EState *estate, Datum *values, bool *isnull, TupleDesc tupdesc)
 	if (!OidIsValid(targetid))
 		ereport(ERROR,
 				(errcode(ERRCODE_NO_PARTITION_FOR_PARTITIONING_KEY),
-				 errmsg("no partition for partitioning key"),
-				 errOmitLocation(true)));
+				 errmsg("no partition for partitioning key")));
 
 
 	Assert(estate->es_result_partitions && estate->es_result_partitions->part);

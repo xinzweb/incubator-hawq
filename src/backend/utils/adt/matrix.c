@@ -37,12 +37,12 @@ do {															\
 	if (isinf(val) && !(inf_is_valid))							\
 		ereport(ERROR,											\
 				(errcode(ERRCODE_NUMERIC_VALUE_OUT_OF_RANGE),	\
-		  errmsg("value out of range: overflow"),errOmitLocation(true)));				\
+		  errmsg("value out of range: overflow")));				\
 																\
 	if ((val) == 0.0 && !(zero_is_valid))						\
 		ereport(ERROR,											\
 				(errcode(ERRCODE_NUMERIC_VALUE_OUT_OF_RANGE),	\
-		 errmsg("value out of range: underflow"),errOmitLocation(true)));				\
+		 errmsg("value out of range: underflow")));				\
 } while(0)
 
 
@@ -54,7 +54,7 @@ do {															\
 	if (SAMESIGN(arg1, arg2) && !SAMESIGN(result, arg1))		\
 		ereport(ERROR,											\
 				(errcode(ERRCODE_NUMERIC_VALUE_OUT_OF_RANGE),	\
-		  errmsg("int value out of range: overflow"),errOmitLocation(true)));				\
+		  errmsg("int value out of range: overflow")));				\
 } while(0)
 
 /*
@@ -80,7 +80,7 @@ do {																					\
 		(result / arg2 != arg1 || (arg2 == -1 && arg1 < 0 && result < 0)))				\
 		ereport(ERROR,																	\
 				(errcode(ERRCODE_NUMERIC_VALUE_OUT_OF_RANGE),							\
-		  errmsg("int value out of range: overflow"),errOmitLocation(true)));			\
+		  errmsg("int value out of range: overflow")));			\
 } while(0)
 
 

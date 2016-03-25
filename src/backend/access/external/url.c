@@ -729,8 +729,7 @@ url_execute_fopen(char* url, char *cmd, bool forwrite, extvar_t *ev)
 		ereport(ERROR,
 				(errcode(ERRCODE_EXTERNAL_ROUTINE_EXCEPTION),
 						errmsg("cannot start external table command: %m"),
-						errdetail("Command: %s", cmd),
-						errOmitLocation(true)));
+						errdetail("Command: %s", cmd)));
 
 	}
 
@@ -806,6 +805,12 @@ url_fopen(char *url,
     {
 		char*	path = strchr(url + strlen(PROTOCOL_FILE), '/');
 		struct fstream_options fo;
+
+		if (forwrite)
+		{
+			free(file);
+			elog(ERROR, "cannot change a readable external table \"%s\"", pstate->cur_relname);
+		}
 
 		Insist(!forwrite);
 		
@@ -1191,8 +1196,7 @@ url_fclose(URL_FILE *file, bool failOnError, const char *relname)
 						(errcode(ERRCODE_EXTERNAL_ROUTINE_EXCEPTION),
 								errmsg("cannot close external table %s command: %m", 
 										(relname ? relname : "")),
-								errdetail("command: %s", url),
-								errOmitLocation(true)));
+								errdetail("command: %s", url)));
 			}
 			else
 			{

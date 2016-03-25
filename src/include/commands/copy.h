@@ -242,6 +242,7 @@ typedef struct CopyStateData
 	List		  *ao_segnos;  /* AO table meta data from dispatcher */
 	List *ao_segfileinfos; /* AO segment file information from dispatcher */
 	List *splits;				/* table scan splits for this segment */
+	bool          skip_ext_partition;  /* skip external partition */
 	/* end Greenplum Database specific variables */
 	struct QueryResource *resource;
 } CopyStateData;

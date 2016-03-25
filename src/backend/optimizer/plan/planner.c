@@ -74,6 +74,7 @@
 #include "cdb/cdbmutate.h" 	/* apply_shareinput */
 #include "cdb/cdbpath.h"        /* cdbpath_segments */
 #include "cdb/cdbpathtoplan.h"  /* cdbpathtoplan_create_flow() */
+#include "cdb/cdbpartition.h" /* query_has_external_partition() */
 #include "cdb/cdbgroup.h" /* grouping_planner extensions */
 #include "cdb/cdbsetop.h" /* motion utilities */
 #include "cdb/cdbsubselect.h"   /* cdbsubselect_flatten_sublinks() */

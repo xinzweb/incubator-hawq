@@ -233,8 +233,7 @@ DefineIndex(Oid relationId,
 	if (isOtherTempNamespace(namespaceId))
 		ereport(ERROR,
 				(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
-				 errmsg("cannot create indexes on temporary tables of other sessions"),
-				 errOmitLocation(true)));
+				 errmsg("cannot create indexes on temporary tables of other sessions")));
 
 	/*
 	 * Verify we (still) have CREATE rights in the rel's namespace.
@@ -880,18 +879,15 @@ CheckPredicate(Expr *predicate)
 	if (contain_subplans((Node *) predicate))
 		ereport(ERROR,
 				(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
-				 errmsg("cannot use subquery in index predicate"),
-						   errOmitLocation(true)));
+				 errmsg("cannot use subquery in index predicate")));
 	if (contain_agg_clause((Node *) predicate))
 		ereport(ERROR,
 				(errcode(ERRCODE_GROUPING_ERROR),
-				 errmsg("cannot use aggregate in index predicate"),
-						   errOmitLocation(true)));
+				 errmsg("cannot use aggregate in index predicate")));
 	if (checkExprHasWindFuncs((Node *)predicate))
 		ereport(ERROR,
 				(errcode(ERRCODE_SYNTAX_ERROR),
-				 errmsg("cannot use window function in index predicate"),
-						   errOmitLocation(true)));
+				 errmsg("cannot use window function in index predicate")));
 	/*
 	 * A predicate using mutable functions is probably wrong, for the same
 	 * reasons that we don't allow an index expression to use one.
@@ -899,8 +895,7 @@ CheckPredicate(Expr *predicate)
 	if (contain_mutable_functions((Node *) predicate))
 		ereport(ERROR,
 				(errcode(ERRCODE_INVALID_OBJECT_DEFINITION),
-		   errmsg("functions in index predicate must be marked IMMUTABLE"),
-				   errOmitLocation(true)));
+		   errmsg("functions in index predicate must be marked IMMUTABLE")));
 }
 
 static void

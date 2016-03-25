@@ -102,8 +102,7 @@ PrepareQuery(PrepareStmt *stmt, const char *queryString)
 		default:
 			ereport(ERROR,
 					(errcode(ERRCODE_INVALID_PSTATEMENT_DEFINITION),
-					 errmsg("utility statements cannot be prepared"),
-							   errOmitLocation(true)));
+					 errmsg("utility statements cannot be prepared")));
 			commandTag = NULL;	/* keep compiler quiet */
 			srctag = T_Query;
 			break;
@@ -230,8 +229,7 @@ ExecuteQuery(ExecuteStmt *stmt, const char *queryString,
 		if (pstmt->commandType != CMD_SELECT)
 			ereport(ERROR,
 					(errcode(ERRCODE_WRONG_OBJECT_TYPE),
-					 errmsg("prepared statement is not a SELECT"),
-							   errOmitLocation(true)));
+					 errmsg("prepared statement is not a SELECT")));
 
 		pstmt->intoClause = copyObject(stmt->into);
 
@@ -389,8 +387,7 @@ StorePreparedStatement(const char *stmt_name,
 		ereport(ERROR,
 				(errcode(ERRCODE_DUPLICATE_PSTATEMENT),
 				 errmsg("prepared statement \"%s\" already exists",
-						stmt_name),
-								   errOmitLocation(true)));
+						stmt_name)));
 
 	/* Make a permanent memory context for the hashtable entry */
 	entrycxt = AllocSetContextCreate(TopMemoryContext,
@@ -460,8 +457,7 @@ FetchPreparedStatement(const char *stmt_name, bool throwError)
 		ereport(ERROR,
 				(errcode(ERRCODE_UNDEFINED_PSTATEMENT),
 				 errmsg("prepared statement \"%s\" does not exist",
-						stmt_name),
-								   errOmitLocation(true)));
+						stmt_name)));
 
 	return entry;
 }
@@ -700,8 +696,7 @@ ExplainExecuteQuery(ExecuteStmt *execstmt, ExplainStmt *stmt, const char * query
 				if (query->commandType != CMD_SELECT)
 					ereport(ERROR,
 							(errcode(ERRCODE_WRONG_OBJECT_TYPE),
-							 errmsg("prepared statement is not a SELECT"),
-									   errOmitLocation(true)));
+							 errmsg("prepared statement is not a SELECT")));
 
 				/* Copy the query so we can modify it */
 				query = copyObject(query);

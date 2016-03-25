@@ -221,7 +221,7 @@ static Node *makeIsNotDistinctFromNode(Node *expr, int position);
 		ViewStmt CheckPointStmt CreateConversionStmt
 		DeallocateStmt PrepareStmt ExecuteStmt
 		DropOwnedStmt ReassignOwnedStmt
-		AlterTypeStmt
+		AlterTypeStmt 
 
 %type <node>    deny_login_role deny_interval deny_point deny_day_specifier
 
@@ -351,7 +351,7 @@ static Node *makeIsNotDistinctFromNode(Node *expr, int position);
 %type <boolean> opt_dxl
 %type <defelt>	opt_binary opt_oids copy_delimiter
 
-%type <boolean> copy_from opt_hold
+%type <boolean> copy_from opt_hold skip_external_partition
 
 %type <ival>	opt_column event cursor_options
 %type <objtype>	reindex_type drop_type comment_type
@@ -2573,8 +2573,7 @@ alter_table_partition_cmd:
                     if (pid->idtype != AT_AP_IDName)
 						ereport(ERROR,
 								(errcode(ERRCODE_SYNTAX_ERROR),
-								 errmsg("Can only ADD a partition by name"),
-								 errOmitLocation(true)));
+								 errmsg("Can only ADD a partition by name")));
 
                     pc->partid = (Node *)pid;
 
@@ -3149,7 +3148,7 @@ ClosePortalStmt:
 
 CopyStmt:	COPY opt_binary qualified_name opt_column_list opt_oids
 			copy_from copy_file_name copy_delimiter opt_with copy_opt_list
-			OptSingleRowErrorHandling
+			OptSingleRowErrorHandling skip_external_partition
 				{
 					CopyStmt *n = makeNode(CopyStmt);
 					n->relation = $3;
@@ -3186,6 +3185,7 @@ CopyStmt:	COPY opt_binary qualified_name opt_column_list opt_oids
 					n->options = $6;
 					n->partitions = NULL;
 					n->ao_segnos = NIL;
+					n->skip_ext_partition = false;
 					$$ = (Node *)n;
 				}
 		;
@@ -3195,6 +3195,10 @@ copy_from:
 			| TO									{ $$ = FALSE; }
 		;
 
+skip_external_partition:
+			IGNORE_P EXTERNAL PARTITIONS			{ $$ = TRUE; }
+			| /*EMPTY*/								{ $$ = FALSE; }
+		;
 /*
  * copy_file_name NULL indicates stdio is used. Whether stdin or stdout is
  * used depends on the direction. (It really doesn't make sense to copy from
@@ -4295,8 +4299,7 @@ partition_hash_keyword: 			HASH
                     if (!gp_enable_hash_partitioned_tables)
                         ereport(ERROR,
                             (errcode(ERRCODE_SYNTAX_ERROR),
-                             errmsg("PARTITION BY must specify RANGE or LIST"),
-                             errOmitLocation(true)));
+                             errmsg("PARTITION BY must specify RANGE or LIST")));
 
                     $$ = 1;
                 }
@@ -4398,8 +4401,7 @@ TabSubPartitionTemplate:
 										(errcode(ERRCODE_SYNTAX_ERROR),
 										 errmsg("template cannot contain "
 												"specification for child "
-												"partition"),
-										 errOmitLocation(true)));
+												"partition")));
 						}
 
 					}
@@ -4495,8 +4497,7 @@ CreateAsStmt:
 						ereport(ERROR,
                                 (errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
 								 errmsg("Cannot create a partitioned table using CREATE TABLE AS SELECT"),
-                                 errhint("Use CREATE TABLE...LIKE (followed by INSERT...SELECT) instead"),
-                                 errOmitLocation(true)));
+                                 errhint("Use CREATE TABLE...LIKE (followed by INSERT...SELECT) instead")));
 					
 					$$ = $6;
 				}
@@ -4605,8 +4606,7 @@ CreateExternalStmt:	CREATE OptWritable EXTERNAL OptWeb OptTemp TABLE qualified_n
 									ereport(ERROR,
 											(errcode(ERRCODE_SYNTAX_ERROR),
 										 	 errmsg("EXECUTE may not be used with a regular external table"),
-										 	 errhint("Use CREATE EXTERNAL WEB TABLE instead"),
-										 	 errOmitLocation(true)));							
+										 	 errhint("Use CREATE EXTERNAL WEB TABLE instead")));							
 								
 								/* if no ON clause specified, default to "ON ALL" */
 								if(extdesc->on_clause == NIL)
@@ -7196,7 +7196,6 @@ oper_argtypes:
 						   (errcode(ERRCODE_SYNTAX_ERROR),
 							errmsg("missing argument"),
 							errhint("Use NONE to denote the missing argument of a unary operator."),
-                            errOmitLocation(true),
 							scanner_errposition(@1)));
 				}
 			| Typename ',' Typename

@@ -261,15 +261,13 @@ ValidateProtocolFunction(List *fnName, ExtPtcFuncType fntype)
 		ereport(ERROR,
 				(errcode(ERRCODE_UNDEFINED_FUNCTION),
 				 errmsg("function %s does not exist",
-						func_signature_string(fnName, nargs, inputTypes)),
-				 errOmitLocation(true)));
+						func_signature_string(fnName, nargs, inputTypes))));
 	
 	if (retset)
 		ereport(ERROR,
 				(errcode(ERRCODE_DATATYPE_MISMATCH),
 				 errmsg("Invalid protocol function"),
-				 errdetail("Protocol functions cannot return sets."),
-				 errOmitLocation(true)));		
+				 errdetail("Protocol functions cannot return sets.")));		
 
 	if (actual_rettype != desired_rettype)
 		ereport(ERROR,
@@ -277,8 +275,7 @@ ValidateProtocolFunction(List *fnName, ExtPtcFuncType fntype)
 				 errmsg("%s protocol function %s must return %s",
 						func_type_to_name(fntype),
 						func_signature_string(fnName, nargs, inputTypes),
-						(fntype == EXTPTC_FUNC_VALIDATOR ? "void" : "an integer")),
-				 errOmitLocation(true)));
+						(fntype == EXTPTC_FUNC_VALIDATOR ? "void" : "an integer"))));
 	
 	if (func_volatile(fnOid) == PROVOLATILE_IMMUTABLE)
 		ereport(ERROR,
@@ -286,8 +283,7 @@ ValidateProtocolFunction(List *fnName, ExtPtcFuncType fntype)
 				 errmsg("%s protocol function %s is declared IMMUTABLE",
 						func_type_to_name(fntype),
 						func_signature_string(fnName, nargs, inputTypes)),
-				 errhint("PROTOCOL functions must be declared STABLE or VOLATILE"),
-				 errOmitLocation(true)));
+				 errhint("PROTOCOL functions must be declared STABLE or VOLATILE")));
 
 	
 	/* Check protocol creator has permission to call the function */
